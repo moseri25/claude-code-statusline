@@ -29,6 +29,19 @@ RL5_PCT=$(j '.rate_limits.five_hour.used_percentage // 0' | cut -d. -f1)
 RL7_PCT=$(j '.rate_limits.seven_day.used_percentage // 0' | cut -d. -f1)
 
 EFFORT=$(jq -r '.effortLevel // empty' ~/.claude/settings.json 2>/dev/null)
+THINKING=$(jq -r '.alwaysThinkingEnabled // true' ~/.claude/settings.json 2>/dev/null)
+
+# effort display mapping
+effort_label() {
+  case "$1" in
+    low)    echo "🧠 low" ;;
+    medium) echo "🧠 medium" ;;
+    high)   echo "🧠 high" ;;
+    xhigh)  echo "🧠⚡ xhigh" ;;
+    *)      echo "" ;;
+  esac
+}
+EFFORT_LABEL=$(effort_label "$EFFORT")
 
 CAVEMAN_LEVEL=""
 if [ -f ~/.claude/caveman_state ]; then
@@ -172,7 +185,13 @@ else
   add "[$MODEL]" "${CYAN}[$MODEL]${RESET}"
 fi
 [ -n "$VERSION" ] && add "v$VERSION" "${GRAY}v$VERSION${RESET}"
-[ -n "$EFFORT" ] && add "🧠$EFFORT" "${MAGENTA}🧠$EFFORT${RESET}"
+if [ -n "$EFFORT_LABEL" ]; then
+  if [ "$EFFORT" = "xhigh" ]; then
+    add "$EFFORT_LABEL (max)" "${RED}$EFFORT_LABEL (max)${RESET}"
+  else
+    add "$EFFORT_LABEL" "${MAGENTA}$EFFORT_LABEL${RESET}"
+  fi
+fi
 [ -n "$CAVEMAN_LEVEL" ] && add "🦧caveman - $CAVEMAN_LEVEL" "${YELLOW}🦧caveman - $CAVEMAN_LEVEL${RESET}"
 add "📁 ${DIR##*/}" "${CYAN}📁 ${DIR##*/}${RESET}"
 add "$GB_PLAIN" "$GB_COL"
