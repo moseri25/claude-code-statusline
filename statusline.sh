@@ -5,19 +5,16 @@
 
 # Try to read cached status first (for real-time display without messages)
 CACHE="$HOME/.claude/token_cache.json"
-input=$(cat 2>/dev/null || echo '{}')
-if [ "$input" = "{}" ] || ! echo "$input" | jq empty 2>/dev/null; then
-  # Stdin empty or invalid JSON, try cache
-  if [ -f "$CACHE" ] && [ -s "$CACHE" ]; then
-    COST=$(jq -r '.cost.total_cost_usd // null' "$CACHE" 2>/dev/null)
-    if [ "$COST" != "null" ] && [ -n "$COST" ]; then
-      input=$(cat "$CACHE")
-    else
-      input='{}'  # Fallback to empty JSON
-    fi
+if [ -f "$CACHE" ] && [ -s "$CACHE" ]; then
+  # Only use cache if it has real data (not nulls)
+  COST=$(jq -r '.cost.total_cost_usd // null' "$CACHE" 2>/dev/null)
+  if [ "$COST" != "null" ] && [ -n "$COST" ]; then
+    input=$(cat "$CACHE")
   else
-    input='{}'  # No cache, use empty JSON
+    input=$(cat)  # Cache is empty, read from stdin
   fi
+else
+  input=$(cat)
 fi
 
 # ---- terminal width ----
@@ -28,10 +25,6 @@ COLS=${COLUMNS:-0}
 # ---- colors ----
 CYAN='\033[36m'; GREEN='\033[32m'; YELLOW='\033[33m'; RED='\033[31m'
 MAGENTA='\033[35m'; GRAY='\033[90m'; RESET='\033[0m'
-
-# Emoji disable option for terminals that don't support UTF-8 emoji (set DISABLE_EMOJI=1 to disable)
-DISABLE_EMOJI=${DISABLE_EMOJI:-0}
-em() { [ "$DISABLE_EMOJI" = "1" ] && echo "" || echo "$1"; }
 
 j() { echo "$input" | jq -r "$1"; }
 
@@ -82,11 +75,11 @@ EFFORT=$(validate_effort "$MODEL_ID" "$EFFORT")
 thinking_label() {
   case "$1" in
     none)   echo "" ;;  # Haiku: no thinking support
-    low)    echo "$(em 🧠) low" ;;
-    medium) echo "$(em 🧠) medium" ;;
-    high)   echo "$(em 🧠) high" ;;
-    xhigh)  echo "$(em 🧠)$(em ⚡) xhigh" ;;
-    max)    echo "$(em 🧠)$(em ⚡)$(em ⚡) max" ;;
+    low)    echo "🧠 low" ;;
+    medium) echo "🧠 medium" ;;
+    high)   echo "🧠 high" ;;
+    xhigh)  echo "🧠⚡ xhigh" ;;
+    max)    echo "🧠⚡⚡ max" ;;
     *)      echo "" ;;
   esac
 }
@@ -118,16 +111,16 @@ fi
 # ---- API vs Subscription mode ----
 if [ -n "$ANTHROPIC_API_KEY" ] || [ -n "$ANTHROPIC_AUTH_TOKEN" ] || [ -n "$ANTHROPIC_BASE_URL" ]; then
   API_ACTIVE=1
-  API_PLAIN="$(em 🔑) API Active"
-  API_COL="${YELLOW}$(em 🔑) API Active${RESET}"
-  SUB_PLAIN="$(em 📡) Subscription Inactive"
-  SUB_COL="${GRAY}$(em 📡) Subscription Inactive${RESET}"
+  API_PLAIN="🔑 API Active"
+  API_COL="${YELLOW}🔑 API Active${RESET}"
+  SUB_PLAIN="📡 Subscription Inactive"
+  SUB_COL="${GRAY}📡 Subscription Inactive${RESET}"
 else
   API_ACTIVE=0
-  API_PLAIN="$(em 🔑) API Inactive"
-  API_COL="${GRAY}$(em 🔑) API Inactive${RESET}"
-  SUB_PLAIN="$(em ✅) Subscription Active"
-  SUB_COL="${GREEN}$(em ✅) Subscription Active${RESET}"
+  API_PLAIN="🔑 API Inactive"
+  API_COL="${GRAY}🔑 API Inactive${RESET}"
+  SUB_PLAIN="✅ Subscription Active"
+  SUB_COL="${GREEN}✅ Subscription Active${RESET}"
 fi
 
 # ---- token sums (5h / 7d / all-time) ----
@@ -196,11 +189,11 @@ if [ -n "$GB" ]; then
   GX=" ±${GM} ↑${GAHEAD} ↓${GBEHIND}"
   # color: ± yellow, ↑ green, ↓ red
   GX_COL=" ${YELLOW}±${GM}${RESET} ${GREEN}↑${GAHEAD}${RESET} ${RED}↓${GBEHIND}${RESET}"
-  GB_PLAIN="$(em 🌿) ${GB:-?}${GX}"
-  GB_COL="${GREEN}$(em 🌿) ${GB:-?}${RESET}${GX_COL}"
+  GB_PLAIN="🌿 ${GB:-?}${GX}"
+  GB_COL="${GREEN}🌿 ${GB:-?}${RESET}${GX_COL}"
 else
-  GB_PLAIN="$(em 🌿) —"
-  GB_COL="${GRAY}$(em 🌿) —${RESET}"
+  GB_PLAIN="🌿 —"
+  GB_COL="${GRAY}🌿 —${RESET}"
 fi
 
 fmt_until() {
@@ -229,7 +222,6 @@ reset_in() {
 RL5_IN=$(reset_in "$RL5")
 RL7_IN=$(reset_in "$RL7")
 
-COST=${COST:-0}
 COST_FMT=$(printf '$%.2f' "$COST")
 
 # ---- segments: PLAIN  COLORED ----
@@ -239,7 +231,7 @@ seg_color=()
 add() { seg_plain+=("$1"); seg_color+=("$2"); }
 brk() { seg_plain+=("__BREAK__"); seg_color+=("__BREAK__"); }
 
-add "$(em 👤) Created by Yaakov Moseri" "${GRAY}$(em 👤) Created by Yaakov Moseri${RESET}"
+add "👤 Created by Yaakov Moseri" "${GRAY}👤 Created by Yaakov Moseri${RESET}"
 brk
 # show actual current model (from settings.json after auto_select hook)
 # + project recommendation for future prompts
@@ -258,8 +250,8 @@ if [ -n "$THINKING_LABEL" ]; then
   fi
 fi
 [ -n "$VERSION" ] && add "v$VERSION" "${GRAY}v$VERSION${RESET}"
-[ -n "$CAVEMAN_LEVEL" ] && add "$(em 🦧)caveman - $CAVEMAN_LEVEL" "${YELLOW}$(em 🦧)caveman - $CAVEMAN_LEVEL${RESET}"
-add "$(em 📁) ${DIR##*/}" "${CYAN}$(em 📁) ${DIR##*/}${RESET}"
+[ -n "$CAVEMAN_LEVEL" ] && add "🦧caveman - $CAVEMAN_LEVEL" "${YELLOW}🦧caveman - $CAVEMAN_LEVEL${RESET}"
+add "📁 ${DIR##*/}" "${CYAN}📁 ${DIR##*/}${RESET}"
 add "$GB_PLAIN" "$GB_COL"
 brk
 RL5_TIME=""; RL5_DATE=""
@@ -267,25 +259,25 @@ if [ -n "$RL5" ]; then
   RL5_TIME=$(date -d "$RL5" +%H:%M 2>/dev/null)
 fi
 RL5_IN_DISPLAY=""; RL5_IN_COL=""
-[ -n "$RL5_IN" ] && RL5_IN_DISPLAY="$(em ⏳)${RL5_IN}" && RL5_IN_COL="${GRAY}$(em ⏳)${RL5_IN}${RESET}"
+[ -n "$RL5_IN" ] && RL5_IN_DISPLAY="⏳${RL5_IN}" && RL5_IN_COL="${GRAY}⏳${RL5_IN}${RESET}"
 
 RL7_DATE=""
 if [ -n "$RL7" ]; then
   RL7_DATE=$(date -d "$RL7" +%Y-%m-%d 2>/dev/null)
 fi
 RL7_IN_DISPLAY=""; RL7_IN_COL=""
-[ -n "$RL7_IN" ] && RL7_IN_DISPLAY="$(em ⏳)${RL7_IN}" && RL7_IN_COL="${GRAY}$(em ⏳)${RL7_IN}${RESET}"
+[ -n "$RL7_IN" ] && RL7_IN_DISPLAY="⏳${RL7_IN}" && RL7_IN_COL="${GRAY}⏳${RL7_IN}${RESET}"
 
 # Format with right-aligned time/date columns
-add "5h ${BAR5} ${RL5_PCT:-0}% $(em 🪙)${TOK_DAY_F}  ${RL5_IN_DISPLAY}  resets: ${RL5_TIME}" "${CYAN}5h${RESET} ${BC5}${BAR5}${RESET} ${BC5}${RL5_PCT:-0}%${RESET} $(em 🪙)${TOK_DAY_F}  ${RL5_IN_COL}  ${GRAY}resets: ${RL5_TIME}${RESET}"
+add "5h ${BAR5} ${RL5_PCT:-0}% 🪙${TOK_DAY_F}  ${RL5_IN_DISPLAY}  resets: ${RL5_TIME}" "${CYAN}5h${RESET} ${BC5}${BAR5}${RESET} ${BC5}${RL5_PCT:-0}%${RESET} 🪙${TOK_DAY_F}  ${RL5_IN_COL}  ${GRAY}resets: ${RL5_TIME}${RESET}"
 brk
-add "7d ${BAR7} ${RL7_PCT:-0}% $(em 🪙)${TOK_WEEK_F}  ${RL7_IN_DISPLAY}  resets: ${RL7_DATE}" "${MAGENTA}7d${RESET} ${BC7}${BAR7}${RESET} ${BC7}${RL7_PCT:-0}%${RESET} $(em 🪙)${TOK_WEEK_F}  ${RL7_IN_COL}  ${GRAY}resets: ${RL7_DATE}${RESET}"
+add "7d ${BAR7} ${RL7_PCT:-0}% 🪙${TOK_WEEK_F}  ${RL7_IN_DISPLAY}  resets: ${RL7_DATE}" "${MAGENTA}7d${RESET} ${BC7}${BAR7}${RESET} ${BC7}${RL7_PCT:-0}%${RESET} 🪙${TOK_WEEK_F}  ${RL7_IN_COL}  ${GRAY}resets: ${RL7_DATE}${RESET}"
 if [ "$API_ACTIVE" = "1" ]; then
   add "${COST_FMT} ${API_PLAIN}" "${YELLOW}${COST_FMT}${RESET} ${API_COL}"
 else
   add "${SUB_PLAIN}" "${SUB_COL}"
 fi
-add "$(em ⏱️) ${DUR_STR}" "$(em ⏱️) ${DUR_STR}"
+add "⏱️ ${DUR_STR}" "⏱️ ${DUR_STR}"
 
 # ---- recommendation: cache codebase complexity (1h) ----
 # Real Claude thinking: Haiku (no thinking) → Sonnet (low/med/high) → Opus (high/xhigh/max)
@@ -377,10 +369,9 @@ pctcol() {
 
 # emoji width-adjust: each emoji counts as 2 cols, bash ${#var} counts 1
 emoji_extra() {
-  [ "$DISABLE_EMOJI" = "1" ] && echo 0 && return
   local s=$1 n=0 ch
   # count known emoji
-  for e in 🧠 📁 🌿 ⏱️ 🔄 🔑 📡 💡 🦧 ⚡ 🪙 ✅ 📡; do
+  for e in 🧠 📁 🌿 ⏱️ 🔄 🔑 📡 💡 🦧; do
     local t=${s//$e/}
     local diff=$(( (${#s} - ${#t}) / ${#e} ))
     n=$((n + diff))
