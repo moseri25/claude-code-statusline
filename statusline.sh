@@ -31,6 +31,11 @@ RL7_PCT=$(j '.rate_limits.seven_day.used_percentage // 0' | cut -d. -f1)
 EFFORT=$(jq -r '.effortLevel // empty' ~/.claude/settings.json 2>/dev/null)
 THINKING=$(jq -r '.alwaysThinkingEnabled // true' ~/.claude/settings.json 2>/dev/null)
 
+# Get current model from settings.json (authoritative source)
+MODEL_FROM_SETTINGS=$(jq -r '.model // empty' ~/.claude/settings.json 2>/dev/null)
+# Fall back to input JSON if settings doesn't have it
+MODEL_ID=$([ -n "$MODEL_FROM_SETTINGS" ] && echo "$MODEL_FROM_SETTINGS" || j '.model.id // ""')
+
 # Validate effort level against model capabilities (Claude official docs)
 validate_effort() {
   local model=$1 effort=$2
@@ -52,7 +57,6 @@ validate_effort() {
   esac
 }
 
-MODEL_ID=$(j '.model.id // ""')
 EFFORT=$(validate_effort "$MODEL_ID" "$EFFORT")
 
 # adaptive thinking display mapping (Claude official)
