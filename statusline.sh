@@ -164,6 +164,7 @@ seg_color=()
 add() { seg_plain+=("$1"); seg_color+=("$2"); }
 brk() { seg_plain+=("__BREAK__"); seg_color+=("__BREAK__"); }
 
+add "👤 Yaakov Moseri" "${GRAY}👤 Yaakov Moseri${RESET}"
 if [ "$MODEL_LABEL" != "$MODEL" ]; then
   add "[$MODEL_LABEL]" "${CYAN}[$MODEL${RESET}${YELLOW} → $TARGET_DISPLAY${RESET}${CYAN}]${RESET}"
 else
@@ -188,7 +189,6 @@ else
   add "${SUB_PLAIN}" "${SUB_COL}"
 fi
 add "⏱️ ${DUR_STR}" "⏱️ ${DUR_STR}"
-add "👤 by Yaakov Moseri" "${GRAY}👤 by Yaakov Moseri${RESET}"
 
 if false; then
 # ---- recommendation: fully automatic heuristic (cached 1h) ----
