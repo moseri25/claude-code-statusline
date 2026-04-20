@@ -3,7 +3,13 @@
 # Created by Yaakov Moseri
 # https://github.com/moseri25/claude-code-statusline
 
-input=$(cat)
+# Try to read cached status first (for real-time display without messages)
+CACHE="$HOME/.claude/token_cache.json"
+if [ -f "$CACHE" ] && [ -s "$CACHE" ]; then
+  input=$(cat "$CACHE")
+else
+  input=$(cat)
+fi
 
 # ---- terminal width ----
 COLS=${COLUMNS:-0}
