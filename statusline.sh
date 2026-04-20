@@ -179,8 +179,10 @@ brk() { seg_plain+=("__BREAK__"); seg_color+=("__BREAK__"); }
 
 add "👤 Created by Yaakov Moseri" "${GRAY}👤 Created by Yaakov Moseri${RESET}"
 brk
-if [ "$MODEL_LABEL" != "$MODEL" ]; then
-  add "[$MODEL_LABEL]" "${CYAN}[$MODEL${RESET}${YELLOW} → $TARGET_DISPLAY${RESET}${CYAN}]${RESET}"
+# show actual current model (from settings.json after auto_select hook)
+# + project recommendation for future prompts
+if [ -n "$TARGET_DISPLAY" ]; then
+  add "[$TARGET_DISPLAY]" "${CYAN}[$TARGET_DISPLAY]${RESET}"
 else
   add "[$MODEL]" "${CYAN}[$MODEL]${RESET}"
 fi
