@@ -254,10 +254,20 @@ fi
 add "📁 ${DIR##*/}" "${CYAN}📁 ${DIR##*/}${RESET}"
 add "$GB_PLAIN" "$GB_COL"
 brk
+RL5_TIME=""; RL5_DATE=""
+if [ -n "$RL5" ]; then
+  RL5_TIME=$(date -d "$RL5" +%H:%M 2>/dev/null)
+fi
 RL5_SUFFIX=""; RL5_SUFFIX_COL=""
-[ -n "$RL5_IN" ] && RL5_SUFFIX=" ⏳${RL5_IN}" && RL5_SUFFIX_COL=" ${GRAY}⏳${RL5_IN}${RESET}"
+[ -n "$RL5_IN" ] && RL5_SUFFIX=" ⏳${RL5_IN}${RL5_TIME:+ @${RL5_TIME}}" && RL5_SUFFIX_COL=" ${GRAY}⏳${RL5_IN}${RL5_TIME:+ @${RL5_TIME}}${RESET}"
+
+RL7_DATE=""
+if [ -n "$RL7" ]; then
+  RL7_DATE=$(date -d "$RL7" +%Y-%m-%d 2>/dev/null)
+fi
 RL7_SUFFIX=""; RL7_SUFFIX_COL=""
-[ -n "$RL7_IN" ] && RL7_SUFFIX=" ⏳${RL7_IN}" && RL7_SUFFIX_COL=" ${GRAY}⏳${RL7_IN}${RESET}"
+[ -n "$RL7_IN" ] && RL7_SUFFIX=" ⏳${RL7_IN}${RL7_DATE:+ ${RL7_DATE}}" && RL7_SUFFIX_COL=" ${GRAY}⏳${RL7_IN}${RL7_DATE:+ ${RL7_DATE}}${RESET}"
+
 add "5h ${BAR5} ${RL5_PCT:-0}% 🪙${TOK_DAY_F}${RL5_SUFFIX}" "${CYAN}5h${RESET} ${BC5}${BAR5}${RESET} ${BC5}${RL5_PCT:-0}%${RESET} 🪙${TOK_DAY_F}${RL5_SUFFIX_COL}"
 brk
 add "7d ${BAR7} ${RL7_PCT:-0}% 🪙${TOK_WEEK_F}${RL7_SUFFIX}" "${MAGENTA}7d${RESET} ${BC7}${BAR7}${RESET} ${BC7}${RL7_PCT:-0}%${RESET} 🪙${TOK_WEEK_F}${RL7_SUFFIX_COL}"
