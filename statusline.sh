@@ -320,12 +320,8 @@ case "$CUR_MODEL_ID" in
             esac ;;
 esac
 
-if [ "$CUR_TIER" -ge "$REC_TIER" ]; then
-  REC_COL=$GREEN
-else
-  REC_COL=$YELLOW
-fi
-[ -n "$REC_MODEL" ] && add "💡 rec: $REC_MODEL/$REC_EFFORT" "${REC_COL}💡 rec: $REC_MODEL/$REC_EFFORT${RESET}"
+# Recommendation display removed per user request
+# [ -n "$REC_MODEL" ] && add "💡 rec: $REC_MODEL/$REC_EFFORT" "${REC_COL}💡 rec: $REC_MODEL/$REC_EFFORT${RESET}"
 
 pctcol() {
   local p=$1
