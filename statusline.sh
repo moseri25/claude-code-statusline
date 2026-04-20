@@ -191,9 +191,9 @@ fi
 [ -n "$VERSION" ] && add "v$VERSION" "${GRAY}v$VERSION${RESET}"
 if [ -n "$THINKING_LABEL" ]; then
   if [ "$EFFORT" = "max" ]; then
-    add "$THINKING_LABEL (max)" "${RED}$THINKING_LABEL (max)${RESET}"
+    add "$THINKING_LABEL" "${RED}$THINKING_LABEL${RESET}"
   elif [ "$EFFORT" = "xhigh" ]; then
-    add "$THINKING_LABEL (xhigh)" "${YELLOW}$THINKING_LABEL (xhigh)${RESET}"
+    add "$THINKING_LABEL" "${YELLOW}$THINKING_LABEL${RESET}"
   else
     add "$THINKING_LABEL" "${MAGENTA}$THINKING_LABEL${RESET}"
   fi
