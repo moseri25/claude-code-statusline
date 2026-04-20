@@ -29,9 +29,9 @@ COLS=${COLUMNS:-0}
 CYAN='\033[36m'; GREEN='\033[32m'; YELLOW='\033[33m'; RED='\033[31m'
 MAGENTA='\033[35m'; GRAY='\033[90m'; RESET='\033[0m'
 
-# Emoji disable option for terminals that don't support UTF-8 emoji
-NO_EMOJI=${NO_EMOJI:-0}
-em() { [ "$NO_EMOJI" = "1" ] && echo "" || echo "$1"; }
+# Emoji disable option for terminals that don't support UTF-8 emoji (set DISABLE_EMOJI=1 to disable)
+DISABLE_EMOJI=${DISABLE_EMOJI:-0}
+em() { [ "$DISABLE_EMOJI" = "1" ] && echo "" || echo "$1"; }
 
 j() { echo "$input" | jq -r "$1"; }
 
@@ -377,7 +377,7 @@ pctcol() {
 
 # emoji width-adjust: each emoji counts as 2 cols, bash ${#var} counts 1
 emoji_extra() {
-  [ "$NO_EMOJI" = "1" ] && echo 0 && return
+  [ "$DISABLE_EMOJI" = "1" ] && echo 0 && return
   local s=$1 n=0 ch
   # count known emoji
   for e in 🧠 📁 🌿 ⏱️ 🔄 🔑 📡 💡 🦧 ⚡ 🪙 ✅ 📡; do
