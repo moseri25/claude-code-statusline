@@ -162,9 +162,8 @@ if git -C "$DIR" rev-parse --git-dir >/dev/null 2>&1; then
     GAHEAD=$(echo "$GAB" | awk '{print $2}')
   fi
   GX=" ±${GM} ↑${GAHEAD} ↓${GBEHIND}"
-  # color each counter: grey if 0, yellow if non-zero
-  col() { [ "$1" -gt 0 ] && echo "$YELLOW$2$1$RESET" || echo "$GRAY$2$1$RESET"; }
-  GX_COL=" $(col "$GM" '±') $(col "$GAHEAD" '↑') $(col "$GBEHIND" '↓')"
+  # color: ± yellow, ↑ green, ↓ red
+  GX_COL=" ${YELLOW}±${GM}${RESET} ${GREEN}↑${GAHEAD}${RESET} ${RED}↓${GBEHIND}${RESET}"
   GB_PLAIN="🌿 ${GB:-?}${GX}"
   GB_COL="${GREEN}🌿 ${GB:-?}${RESET}${GX_COL}"
 else
