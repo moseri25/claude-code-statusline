@@ -140,7 +140,7 @@ TOK_WEEK_F=$(fmt_tok $T_WEEK)
 
 make_bar() {
   local pct=$1
-  local f=$((pct/10)); [ $f -gt 10 ] && f=10; local e=$((10-f))
+  local f=$(( pct*7/100 )); [ $f -gt 7 ] && f=7; local e=$((7-f))
   printf -v FP "%${f}s" ""; printf -v EP "%${e}s" ""
   echo "${FP// /█}${EP// /░}"
 }
@@ -262,17 +262,19 @@ fi
 RL5_IN_DISPLAY=""; RL5_IN_COL=""
 [ -n "$RL5_IN" ] && RL5_IN_DISPLAY="⏳${RL5_IN}" && RL5_IN_COL="${GRAY}⏳${RL5_IN}${RESET}"
 
-RL7_DATE=""
+RL7_DATE_SHORT=""
 if [ -n "$RL7" ]; then
-  RL7_DATE=$(date -d "$RL7" +%Y-%m-%d 2>/dev/null)
+  RL7_DATE_SHORT=$(date -d "$RL7" +%d/%m 2>/dev/null)
 fi
 RL7_IN_DISPLAY=""; RL7_IN_COL=""
 [ -n "$RL7_IN" ] && RL7_IN_DISPLAY="⏳${RL7_IN}" && RL7_IN_COL="${GRAY}⏳${RL7_IN}${RESET}"
 
-# Format with right-aligned time/date columns
-add "5h ${BAR5} ${RL5_PCT:-0}% 🪙${TOK_DAY_F}  ${RL5_IN_DISPLAY}  resets: ${RL5_TIME}" "${CYAN}5h${RESET} ${BC5}${BAR5}${RESET} ${BC5}${RL5_PCT:-0}%${RESET} 🪙${TOK_DAY_F}  ${RL5_IN_COL}  ${GRAY}resets: ${RL5_TIME}${RESET}"
+# add_rr: right-aligned solo line
+add_rr() { seg_plain+=("__RR__${1}"); seg_color+=("__RR__${2}"); }
+
+add "5h ${BAR5}${RL5_PCT:-0}% 🪙${TOK_DAY_F} ${RL5_IN_DISPLAY}" "${CYAN}5h${RESET} ${BC5}${BAR5}${BC5}${RL5_PCT:-0}%${RESET} 🪙${TOK_DAY_F} ${RL5_IN_COL}"
 brk
-add "7d ${BAR7} ${RL7_PCT:-0}% 🪙${TOK_WEEK_F}  ${RL7_IN_DISPLAY}  resets: ${RL7_DATE}" "${MAGENTA}7d${RESET} ${BC7}${BAR7}${RESET} ${BC7}${RL7_PCT:-0}%${RESET} 🪙${TOK_WEEK_F}  ${RL7_IN_COL}  ${GRAY}resets: ${RL7_DATE}${RESET}"
+add "7d ${BAR7}${RL7_PCT:-0}% 🪙${TOK_WEEK_F} ${RL7_IN_DISPLAY}" "${MAGENTA}7d${RESET} ${BC7}${BAR7}${BC7}${RL7_PCT:-0}%${RESET} 🪙${TOK_WEEK_F} ${RL7_IN_COL}"
 if [ "$API_ACTIVE" = "1" ]; then
   add "${COST_FMT} ${API_PLAIN}" "${YELLOW}${COST_FMT}${RESET} ${API_COL}"
 else
@@ -395,6 +397,15 @@ for i in "${!seg_plain[@]}"; do
   c="${seg_color[$i]}"
   if [ "$p" = "__BREAK__" ]; then
     flush
+    continue
+  fi
+  if [[ "$p" == __RR__* ]]; then
+    flush
+    rp="${p#__RR__}"; rc="${c#__RR__}"
+    pad=$(( COLS - ${#rp} ))
+    [ $pad -lt 1 ] && pad=1
+    printf -v SP "%${pad}s" ""
+    echo -e "${SP}${rc}"
     continue
   fi
   extra=$(emoji_extra "$p")
