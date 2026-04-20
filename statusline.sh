@@ -258,19 +258,20 @@ RL5_TIME=""; RL5_DATE=""
 if [ -n "$RL5" ]; then
   RL5_TIME=$(date -d "$RL5" +%H:%M 2>/dev/null)
 fi
-RL5_SUFFIX=""; RL5_SUFFIX_COL=""
-[ -n "$RL5_IN" ] && RL5_SUFFIX=" ⏳${RL5_IN}${RL5_TIME:+ @${RL5_TIME}}" && RL5_SUFFIX_COL=" ${GRAY}⏳${RL5_IN}${RL5_TIME:+ @${RL5_TIME}}${RESET}"
+RL5_IN_DISPLAY=""; RL5_IN_COL=""
+[ -n "$RL5_IN" ] && RL5_IN_DISPLAY="⏳${RL5_IN}" && RL5_IN_COL="${GRAY}⏳${RL5_IN}${RESET}"
 
 RL7_DATE=""
 if [ -n "$RL7" ]; then
   RL7_DATE=$(date -d "$RL7" +%Y-%m-%d 2>/dev/null)
 fi
-RL7_SUFFIX=""; RL7_SUFFIX_COL=""
-[ -n "$RL7_IN" ] && RL7_SUFFIX=" ⏳${RL7_IN}${RL7_DATE:+ ${RL7_DATE}}" && RL7_SUFFIX_COL=" ${GRAY}⏳${RL7_IN}${RL7_DATE:+ ${RL7_DATE}}${RESET}"
+RL7_IN_DISPLAY=""; RL7_IN_COL=""
+[ -n "$RL7_IN" ] && RL7_IN_DISPLAY="⏳${RL7_IN}" && RL7_IN_COL="${GRAY}⏳${RL7_IN}${RESET}"
 
-add "5h ${BAR5} ${RL5_PCT:-0}% 🪙${TOK_DAY_F}${RL5_SUFFIX}" "${CYAN}5h${RESET} ${BC5}${BAR5}${RESET} ${BC5}${RL5_PCT:-0}%${RESET} 🪙${TOK_DAY_F}${RL5_SUFFIX_COL}"
+# Format with right-aligned time/date columns
+add "5h ${BAR5} ${RL5_PCT:-0}% 🪙${TOK_DAY_F}  ${RL5_IN_DISPLAY}  resets: ${RL5_TIME}" "${CYAN}5h${RESET} ${BC5}${BAR5}${RESET} ${BC5}${RL5_PCT:-0}%${RESET} 🪙${TOK_DAY_F}  ${RL5_IN_COL}  ${GRAY}resets: ${RL5_TIME}${RESET}"
 brk
-add "7d ${BAR7} ${RL7_PCT:-0}% 🪙${TOK_WEEK_F}${RL7_SUFFIX}" "${MAGENTA}7d${RESET} ${BC7}${BAR7}${RESET} ${BC7}${RL7_PCT:-0}%${RESET} 🪙${TOK_WEEK_F}${RL7_SUFFIX_COL}"
+add "7d ${BAR7} ${RL7_PCT:-0}% 🪙${TOK_WEEK_F}  ${RL7_IN_DISPLAY}  resets: ${RL7_DATE}" "${MAGENTA}7d${RESET} ${BC7}${BAR7}${RESET} ${BC7}${RL7_PCT:-0}%${RESET} 🪙${TOK_WEEK_F}  ${RL7_IN_COL}  ${GRAY}resets: ${RL7_DATE}${RESET}"
 if [ "$API_ACTIVE" = "1" ]; then
   add "${COST_FMT} ${API_PLAIN}" "${YELLOW}${COST_FMT}${RESET} ${API_COL}"
 else
