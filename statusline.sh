@@ -6,7 +6,13 @@
 # Try to read cached status first (for real-time display without messages)
 CACHE="$HOME/.claude/token_cache.json"
 if [ -f "$CACHE" ] && [ -s "$CACHE" ]; then
-  input=$(cat "$CACHE")
+  # Only use cache if it has real data (not nulls)
+  COST=$(jq -r '.cost.total_cost_usd // null' "$CACHE" 2>/dev/null)
+  if [ "$COST" != "null" ] && [ -n "$COST" ]; then
+    input=$(cat "$CACHE")
+  else
+    input=$(cat)  # Cache is empty, read from stdin
+  fi
 else
   input=$(cat)
 fi
