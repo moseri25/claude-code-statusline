@@ -160,19 +160,32 @@ TOTAL_M=$((DURATION_MS/60000))
 H=$((TOTAL_M/60)); M=$((TOTAL_M%60))
 if [ $H -gt 0 ]; then DUR_STR="${H}h ${M}m"; else DUR_STR="${M}m"; fi
 
-# ---- git ----
-if git -C "$DIR" rev-parse --git-dir >/dev/null 2>&1; then
+# ---- git ---- (read from cache first for real-time updates)
+GIT_CACHE="$HOME/.claude/git_cache.json"
+GB=""; GM=0; GAHEAD=0; GBEHIND=0
+
+if [ -f "$GIT_CACHE" ] && [ -s "$GIT_CACHE" ]; then
+  # Try to read from cache
+  GB=$(jq -r '.branch // ""' "$GIT_CACHE" 2>/dev/null)
+  GM=$(jq -r '.modified_files // 0' "$GIT_CACHE" 2>/dev/null)
+  GAHEAD=$(jq -r '.ahead // 0' "$GIT_CACHE" 2>/dev/null)
+  GBEHIND=$(jq -r '.behind // 0' "$GIT_CACHE" 2>/dev/null)
+fi
+
+# Fallback to live git check if cache missing
+if [ -z "$GB" ] && git -C "$DIR" rev-parse --git-dir >/dev/null 2>&1; then
   GB=$(git -C "$DIR" branch --show-current 2>/dev/null)
   [ -z "$GB" ] && GB=$(git -C "$DIR" rev-parse --short HEAD 2>/dev/null)
-  # modified + staged + untracked count
   GM=$(git -C "$DIR" status --porcelain 2>/dev/null | wc -l)
-  # ahead/behind
   GAB=$(git -C "$DIR" rev-list --left-right --count '@{u}...HEAD' 2>/dev/null)
   GAHEAD=0; GBEHIND=0
   if [ -n "$GAB" ]; then
     GBEHIND=$(echo "$GAB" | awk '{print $1}')
     GAHEAD=$(echo "$GAB" | awk '{print $2}')
   fi
+fi
+
+if [ -n "$GB" ]; then
   GX=" ±${GM} ↑${GAHEAD} ↓${GBEHIND}"
   # color: ± yellow, ↑ green, ↓ red
   GX_COL=" ${YELLOW}±${GM}${RESET} ${GREEN}↑${GAHEAD}${RESET} ${RED}↓${GBEHIND}${RESET}"
