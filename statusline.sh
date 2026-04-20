@@ -164,7 +164,7 @@ seg_color=()
 add() { seg_plain+=("$1"); seg_color+=("$2"); }
 brk() { seg_plain+=("__BREAK__"); seg_color+=("__BREAK__"); }
 
-add "👨‍💻 Created by Yaakov Moseri" "${GRAY}👨‍💻 Created by Yaakov Moseri${RESET}"
+add "👤 Created by Yaakov Moseri" "${GRAY}👤 Created by Yaakov Moseri${RESET}"
 if [ "$MODEL_LABEL" != "$MODEL" ]; then
   add "[$MODEL_LABEL]" "${CYAN}[$MODEL${RESET}${YELLOW} → $TARGET_DISPLAY${RESET}${CYAN}]${RESET}"
 else
