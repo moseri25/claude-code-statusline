@@ -140,7 +140,7 @@ TOK_WEEK_F=$(fmt_tok $T_WEEK)
 
 make_bar() {
   local pct=$1
-  local f=$(( pct*7/100 )); [ $f -gt 7 ] && f=7; local e=$((7-f))
+  local f=$(( pct*12/100 )); [ $f -gt 12 ] && f=12; local e=$((12-f))
   printf -v FP "%${f}s" ""; printf -v EP "%${e}s" ""
   echo "${FP// /█}${EP// /░}"
 }
@@ -272,9 +272,9 @@ RL7_IN_DISPLAY=""; RL7_IN_COL=""
 # add_rr: right-aligned solo line
 add_rr() { seg_plain+=("__RR__${1}"); seg_color+=("__RR__${2}"); }
 
-add "5h ${BAR5}${RL5_PCT:-0}% 🪙${TOK_DAY_F} ${RL5_IN_DISPLAY}" "${CYAN}5h${RESET} ${BC5}${BAR5}${BC5}${RL5_PCT:-0}%${RESET} 🪙${TOK_DAY_F} ${RL5_IN_COL}"
+add "5h  ${BAR5} ${RL5_PCT:-0}%  🪙${TOK_DAY_F}  ${RL5_IN_DISPLAY}" "${CYAN}5h${RESET}  ${BC5}${BAR5}${RESET} ${BC5}${RL5_PCT:-0}%${RESET}  🪙${TOK_DAY_F}  ${RL5_IN_COL}"
 brk
-add "7d ${BAR7}${RL7_PCT:-0}% 🪙${TOK_WEEK_F} ${RL7_IN_DISPLAY}" "${MAGENTA}7d${RESET} ${BC7}${BAR7}${BC7}${RL7_PCT:-0}%${RESET} 🪙${TOK_WEEK_F} ${RL7_IN_COL}"
+add "7d  ${BAR7} ${RL7_PCT:-0}%  🪙${TOK_WEEK_F}  ${RL7_IN_DISPLAY}" "${MAGENTA}7d${RESET}  ${BC7}${BAR7}${RESET} ${BC7}${RL7_PCT:-0}%${RESET}  🪙${TOK_WEEK_F}  ${RL7_IN_COL}"
 if [ "$API_ACTIVE" = "1" ]; then
   add "${COST_FMT} ${API_PLAIN}" "${YELLOW}${COST_FMT}${RESET} ${API_COL}"
 else
