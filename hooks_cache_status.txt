@@ -1,0 +1,51 @@
+#!/bin/bash
+# Cache token/cost + git status for real-time statusline display
+# Runs on every UserPromptSubmit - writes to ~/.claude/token_cache.json + git_cache.json
+
+CACHE="$HOME/.claude/token_cache.json"
+GIT_CACHE="$HOME/.claude/git_cache.json"
+
+input=$(cat)
+
+# Extract workspace directory
+DIR=$(echo "$input" | jq -r '.workspace.current_dir // ""')
+
+# Cache token/cost + workspace (used by git_monitor.sh)
+jq '{
+  timestamp: (now | todate),
+  cost: .cost,
+  context: .context_window,
+  rate_limits: .rate_limits,
+  model: .model,
+  workspace: .workspace
+}' <<< "$input" > "$CACHE" 2>/dev/null
+
+# Also write workspace to separate file for monitor to read
+echo "$DIR" > "$HOME/.claude/workspace_cache.txt" 2>/dev/null
+
+# Cache git status
+if [ -n "$DIR" ] && git -C "$DIR" rev-parse --git-dir >/dev/null 2>&1; then
+  GB=$(git -C "$DIR" branch --show-current 2>/dev/null)
+  [ -z "$GB" ] && GB=$(git -C "$DIR" rev-parse --short HEAD 2>/dev/null)
+  GM=$(git -C "$DIR" status --porcelain 2>/dev/null | wc -l)
+  GAB=$(git -C "$DIR" rev-list --left-right --count '@{u}...HEAD' 2>/dev/null)
+  GAHEAD=0; GBEHIND=0
+  if [ -n "$GAB" ]; then
+    GBEHIND=$(echo "$GAB" | awk '{print $1}')
+    GAHEAD=$(echo "$GAB" | awk '{print $2}')
+  fi
+
+  jq -n --arg branch "$GB" --arg files "$GM" --arg ahead "$GAHEAD" --arg behind "$GBEHIND" '{
+    timestamp: (now | todate),
+    branch: $branch,
+    modified_files: ($files | tonumber),
+    ahead: ($ahead | tonumber),
+    behind: ($behind | tonumber)
+  }' > "$GIT_CACHE" 2>/dev/null
+fi
+
+# Pass input through unchanged
+echo "$input"
+
+exit 0
+
