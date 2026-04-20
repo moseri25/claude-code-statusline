@@ -216,7 +216,6 @@ if [ -n "$TARGET_DISPLAY" ]; then
 else
   add "[$MODEL]" "${CYAN}[$MODEL]${RESET}"
 fi
-[ -n "$VERSION" ] && add "v$VERSION" "${GRAY}v$VERSION${RESET}"
 if [ -n "$THINKING_LABEL" ]; then
   if [ "$EFFORT" = "max" ]; then
     add "$THINKING_LABEL" "${RED}$THINKING_LABEL${RESET}"
@@ -226,6 +225,7 @@ if [ -n "$THINKING_LABEL" ]; then
     add "$THINKING_LABEL" "${MAGENTA}$THINKING_LABEL${RESET}"
   fi
 fi
+[ -n "$VERSION" ] && add "v$VERSION" "${GRAY}v$VERSION${RESET}"
 [ -n "$CAVEMAN_LEVEL" ] && add "🦧caveman - $CAVEMAN_LEVEL" "${YELLOW}🦧caveman - $CAVEMAN_LEVEL${RESET}"
 add "📁 ${DIR##*/}" "${CYAN}📁 ${DIR##*/}${RESET}"
 add "$GB_PLAIN" "$GB_COL"
