@@ -81,7 +81,7 @@ elif [ $score -le 38 ]; then
 elif [ $score -le 39 ]; then
   MODEL="claude-opus-4-7"
   EFFORT="high"  # Opus: complex problems
-elif [ $score -le 48 ]; then
+elif [ $score -le 41 ]; then
   MODEL="claude-opus-4-7"
   EFFORT="xhigh"  # Opus: very complex
 else
