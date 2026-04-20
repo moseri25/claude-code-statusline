@@ -212,7 +212,7 @@ else
 fi
 add "⏱️ ${DUR_STR}" "⏱️ ${DUR_STR}"
 
-if true; then
+if false; then
 # ---- recommendation: fully automatic heuristic (cached 1h) ----
 # complexity-based model + thinking effort recommendations
 CACHE_DIR="$HOME/.cache/claude-statusline"
