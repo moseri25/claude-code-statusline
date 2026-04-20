@@ -210,8 +210,9 @@ else
 fi
 add "⏱️ ${DUR_STR}" "⏱️ ${DUR_STR}"
 
-if false; then
+if true; then
 # ---- recommendation: fully automatic heuristic (cached 1h) ----
+# complexity-based model + thinking effort recommendations
 CACHE_DIR="$HOME/.cache/claude-statusline"
 mkdir -p "$CACHE_DIR" 2>/dev/null
 HASH=$(echo -n "$DIR" | md5sum 2>/dev/null | cut -c1-8)
