@@ -188,6 +188,7 @@ else
   add "${SUB_PLAIN}" "${SUB_COL}"
 fi
 add "⏱️ ${DUR_STR}" "⏱️ ${DUR_STR}"
+add "👤 by Yaakov Moseri" "${GRAY}👤 by Yaakov Moseri${RESET}"
 
 if false; then
 # ---- recommendation: fully automatic heuristic (cached 1h) ----
