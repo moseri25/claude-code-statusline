@@ -228,4 +228,10 @@ Set `model` in settings.json to switch Claude models between sessions. Statuslin
 
 ---
 
-**Made for developers who want full control and visibility over their Claude Code workflow.**
+## 👨‍💻 Author
+
+**Yaakov Moseri**
+- GitHub: [@moseri25](https://github.com/moseri25)
+- Project: [claude-code-statusline](https://github.com/moseri25/claude-code-statusline)
+
+Made for developers who want full control and visibility over their Claude Code workflow.

@@ -1,4 +1,8 @@
 #!/bin/bash
+# Claude Code Statusline - Advanced Terminal Status Display
+# Created by Yaakov Moseri
+# https://github.com/moseri25/claude-code-statusline
+
 input=$(cat)
 
 # ---- terminal width ----
