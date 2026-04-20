@@ -222,6 +222,7 @@ reset_in() {
 RL5_IN=$(reset_in "$RL5")
 RL7_IN=$(reset_in "$RL7")
 
+COST=${COST:-0}
 COST_FMT=$(printf '$%.2f' "$COST")
 
 # ---- segments: PLAIN  COLORED ----
