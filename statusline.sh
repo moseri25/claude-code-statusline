@@ -31,6 +31,30 @@ RL7_PCT=$(j '.rate_limits.seven_day.used_percentage // 0' | cut -d. -f1)
 EFFORT=$(jq -r '.effortLevel // empty' ~/.claude/settings.json 2>/dev/null)
 THINKING=$(jq -r '.alwaysThinkingEnabled // true' ~/.claude/settings.json 2>/dev/null)
 
+# Validate effort level against model capabilities (Claude official docs)
+validate_effort() {
+  local model=$1 effort=$2
+  case "$model" in
+    *haiku*)   echo "none" ;;  # Haiku: NO thinking support
+    *sonnet*)  # Sonnet: low/medium/high/max (NO xhigh)
+      case "$effort" in
+        low|medium|high|max) echo "$effort" ;;
+        xhigh) echo "high" ;;  # xhigh not available for Sonnet, downgrade to high
+        *) echo "low" ;;
+      esac ;;
+    *opus*)    # Opus: low/medium/high/xhigh/max
+      case "$effort" in
+        none) echo "low" ;;  # Opus supports thinking, use low minimum
+        low|medium|high|xhigh|max) echo "$effort" ;;
+        *) echo "low" ;;
+      esac ;;
+    *) echo "$effort" ;;
+  esac
+}
+
+MODEL_ID=$(j '.model.id // ""')
+EFFORT=$(validate_effort "$MODEL_ID" "$EFFORT")
+
 # adaptive thinking display mapping (Claude official)
 thinking_label() {
   case "$1" in
