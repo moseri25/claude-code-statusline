@@ -5,16 +5,19 @@
 
 # Try to read cached status first (for real-time display without messages)
 CACHE="$HOME/.claude/token_cache.json"
-if [ -f "$CACHE" ] && [ -s "$CACHE" ]; then
-  # Only use cache if it has real data (not nulls)
-  COST=$(jq -r '.cost.total_cost_usd // null' "$CACHE" 2>/dev/null)
-  if [ "$COST" != "null" ] && [ -n "$COST" ]; then
-    input=$(cat "$CACHE")
+input=$(cat 2>/dev/null || echo '{}')
+if [ "$input" = "{}" ] || ! echo "$input" | jq empty 2>/dev/null; then
+  # Stdin empty or invalid JSON, try cache
+  if [ -f "$CACHE" ] && [ -s "$CACHE" ]; then
+    COST=$(jq -r '.cost.total_cost_usd // null' "$CACHE" 2>/dev/null)
+    if [ "$COST" != "null" ] && [ -n "$COST" ]; then
+      input=$(cat "$CACHE")
+    else
+      input='{}'  # Fallback to empty JSON
+    fi
   else
-    input=$(cat)  # Cache is empty, read from stdin
+    input='{}'  # No cache, use empty JSON
   fi
-else
-  input=$(cat)
 fi
 
 # ---- terminal width ----
@@ -222,6 +225,7 @@ reset_in() {
 RL5_IN=$(reset_in "$RL5")
 RL7_IN=$(reset_in "$RL7")
 
+COST=${COST:-0}
 COST_FMT=$(printf '$%.2f' "$COST")
 
 # ---- segments: PLAIN  COLORED ----
