@@ -57,27 +57,36 @@ done
 # Sonnet 4.6: adaptive thinking with effort: low, medium, high, max
 # Opus 4.7: adaptive thinking with effort: low, medium, high, xhigh, max
 
-if   [ $score -le  5 ]; then
+if   [ $score -le  3 ]; then
   MODEL="claude-haiku-4-5-20251001"
-  EFFORT="none"  # Haiku doesn't support thinking
-elif [ $score -le 10 ]; then
+  EFFORT="none"  # Haiku: no thinking support
+elif [ $score -le  7 ]; then
   MODEL="claude-sonnet-4-6"
-  EFFORT="low"   # Sonnet: light thinking
-elif [ $score -le 18 ]; then
+  EFFORT="low"   # Sonnet: minimal thinking
+elif [ $score -le 12 ]; then
   MODEL="claude-sonnet-4-6"
   EFFORT="medium"  # Sonnet: moderate thinking
-elif [ $score -le 28 ]; then
+elif [ $score -le 19 ]; then
   MODEL="claude-sonnet-4-6"
   EFFORT="high"  # Sonnet: deep thinking
-elif [ $score -le 35 ]; then
+elif [ $score -le 26 ]; then
+  MODEL="claude-sonnet-4-6"
+  EFFORT="max"  # Sonnet: maximum thinking
+elif [ $score -le 32 ]; then
   MODEL="claude-opus-4-7"
-  EFFORT="high"  # Opus: deep thinking
-elif [ $score -le 42 ]; then
+  EFFORT="low"  # Opus: starting complexity
+elif [ $score -le 38 ]; then
   MODEL="claude-opus-4-7"
-  EFFORT="xhigh"  # Opus: very deep thinking
+  EFFORT="medium"  # Opus: moderate complexity
+elif [ $score -le 39 ]; then
+  MODEL="claude-opus-4-7"
+  EFFORT="high"  # Opus: complex problems
+elif [ $score -le 48 ]; then
+  MODEL="claude-opus-4-7"
+  EFFORT="xhigh"  # Opus: very complex
 else
   MODEL="claude-opus-4-7"
-  EFFORT="max"  # Opus: maximum thinking (xhigh + longer budget)
+  EFFORT="max"  # Opus: maximum thinking
 fi
 
 # rewrite settings.json atomically
