@@ -31,17 +31,19 @@ RL7_PCT=$(j '.rate_limits.seven_day.used_percentage // 0' | cut -d. -f1)
 EFFORT=$(jq -r '.effortLevel // empty' ~/.claude/settings.json 2>/dev/null)
 THINKING=$(jq -r '.alwaysThinkingEnabled // true' ~/.claude/settings.json 2>/dev/null)
 
-# effort display mapping
-effort_label() {
+# adaptive thinking display mapping (Claude official)
+thinking_label() {
   case "$1" in
+    none)   echo "" ;;  # Haiku: no thinking support
     low)    echo "🧠 low" ;;
     medium) echo "🧠 medium" ;;
     high)   echo "🧠 high" ;;
     xhigh)  echo "🧠⚡ xhigh" ;;
+    max)    echo "🧠⚡⚡ max" ;;
     *)      echo "" ;;
   esac
 }
-EFFORT_LABEL=$(effort_label "$EFFORT")
+THINKING_LABEL=$(thinking_label "$EFFORT")
 
 CAVEMAN_LEVEL=""
 if [ -f ~/.claude/caveman_state ]; then
@@ -187,11 +189,13 @@ else
   add "[$MODEL]" "${CYAN}[$MODEL]${RESET}"
 fi
 [ -n "$VERSION" ] && add "v$VERSION" "${GRAY}v$VERSION${RESET}"
-if [ -n "$EFFORT_LABEL" ]; then
-  if [ "$EFFORT" = "xhigh" ]; then
-    add "$EFFORT_LABEL (max)" "${RED}$EFFORT_LABEL (max)${RESET}"
+if [ -n "$THINKING_LABEL" ]; then
+  if [ "$EFFORT" = "max" ]; then
+    add "$THINKING_LABEL (max)" "${RED}$THINKING_LABEL (max)${RESET}"
+  elif [ "$EFFORT" = "xhigh" ]; then
+    add "$THINKING_LABEL (xhigh)" "${YELLOW}$THINKING_LABEL (xhigh)${RESET}"
   else
-    add "$EFFORT_LABEL" "${MAGENTA}$EFFORT_LABEL${RESET}"
+    add "$THINKING_LABEL" "${MAGENTA}$THINKING_LABEL${RESET}"
   fi
 fi
 [ -n "$CAVEMAN_LEVEL" ] && add "🦧caveman - $CAVEMAN_LEVEL" "${YELLOW}🦧caveman - $CAVEMAN_LEVEL${RESET}"
@@ -212,9 +216,8 @@ else
 fi
 add "⏱️ ${DUR_STR}" "⏱️ ${DUR_STR}"
 
-if false; then
-# ---- recommendation: fully automatic heuristic (cached 1h) ----
-# complexity-based model + thinking effort recommendations
+# ---- recommendation: cache codebase complexity (1h) ----
+# Real Claude thinking: Haiku (no thinking) → Sonnet (low/med/high) → Opus (high/xhigh/max)
 CACHE_DIR="$HOME/.cache/claude-statusline"
 mkdir -p "$CACHE_DIR" 2>/dev/null
 HASH=$(echo -n "$DIR" | md5sum 2>/dev/null | cut -c1-8)
@@ -223,7 +226,6 @@ HEUR_CACHE="$CACHE_DIR/heur-$HASH"
 HC_AGE=9999
 [ -f "$HEUR_CACHE" ] && HC_AGE=$(( $(date +%s) - $(stat -c %Y "$HEUR_CACHE" 2>/dev/null || echo 0) ))
 if [ $HC_AGE -gt 3600 ]; then
-  # code file count
   NF=$(find "$DIR" -maxdepth 6 -type f \( \
     -name '*.py' -o -name '*.js' -o -name '*.ts' -o -name '*.tsx' -o -name '*.jsx' \
     -o -name '*.go' -o -name '*.rs' -o -name '*.java' -o -name '*.cpp' -o -name '*.c' \
@@ -232,7 +234,6 @@ if [ $HC_AGE -gt 3600 ]; then
     -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/venv/*' \
     -not -path '*/__pycache__/*' -not -path '*/dist/*' -not -path '*/build/*' \
     2>/dev/null | head -3000 | wc -l)
-  # total kB of code (rough proxy for LOC without reading each file)
   KB=$(find "$DIR" -maxdepth 6 -type f \( \
     -name '*.py' -o -name '*.js' -o -name '*.ts' -o -name '*.tsx' -o -name '*.jsx' \
     -o -name '*.go' -o -name '*.rs' -o -name '*.java' -o -name '*.cpp' -o -name '*.c' \
@@ -241,11 +242,9 @@ if [ $HC_AGE -gt 3600 ]; then
     -not -path '*/__pycache__/*' -not -path '*/dist/*' -not -path '*/build/*' \
     -printf '%s\n' 2>/dev/null | awk '{s+=$1} END{print int(s/1024)}')
   KB=${KB:-0}
-  # distinct languages
   LANG_COUNT=$(find "$DIR" -maxdepth 4 -type f -name '*.*' \
     -not -path '*/node_modules/*' -not -path '*/.git/*' 2>/dev/null \
     | sed 's/.*\.//' | sort -u | head -20 | wc -l)
-  # indicators
   HAS_CI=0; HAS_TEST=0; HAS_DOCKER=0; HAS_MONO=0; HAS_TS=0; HAS_INFRA=0; HAS_DB=0; HAS_AI=0
   { [ -d "$DIR/.github/workflows" ] || [ -f "$DIR/.gitlab-ci.yml" ] || [ -f "$DIR/.circleci/config.yml" ]; } && HAS_CI=1
   { [ -d "$DIR/tests" ] || [ -d "$DIR/test" ] || [ -d "$DIR/__tests__" ] || [ -d "$DIR/spec" ]; } && HAS_TEST=1
@@ -256,7 +255,6 @@ if [ $HC_AGE -gt 3600 ]; then
   { [ -d "$DIR/migrations" ] || [ -d "$DIR/db" ] || [ -f "$DIR/prisma/schema.prisma" ] || [ -f "$DIR/schema.sql" ]; } && HAS_DB=1
   { grep -qlE "anthropic|openai|langchain|llm" "$DIR"/*.{py,js,ts,json,toml} 2>/dev/null; } && HAS_AI=1
 
-  # combined complexity score
   SCORE=0
   SCORE=$((SCORE + NF))
   SCORE=$((SCORE + KB / 10))
@@ -271,31 +269,36 @@ if [ $HC_AGE -gt 3600 ]; then
   [ $HAS_DB -eq 1 ] && SCORE=$((SCORE + 15))
   [ $HAS_AI -eq 1 ] && SCORE=$((SCORE + 25))
 
-  if   [ $SCORE -lt 10  ]; then H_MODEL="Haiku 4.5";  H_EFFORT="low";    H_TIER=1
-  elif [ $SCORE -lt 50  ]; then H_MODEL="Sonnet 4.6"; H_EFFORT="medium"; H_TIER=2
-  elif [ $SCORE -lt 200 ]; then H_MODEL="Opus 4.7";   H_EFFORT="high";   H_TIER=3
-  else                          H_MODEL="Opus 4.7";   H_EFFORT="xhigh";  H_TIER=4
+  if   [ $SCORE -lt 10  ]; then H_MODEL="Haiku 4.5";  H_EFFORT="—";  H_TIER=1
+  elif [ $SCORE -lt 50  ]; then H_MODEL="Sonnet 4.6"; H_EFFORT="low"; H_TIER=2
+  elif [ $SCORE -lt 120 ]; then H_MODEL="Sonnet 4.6"; H_EFFORT="high"; H_TIER=3
+  elif [ $SCORE -lt 180 ]; then H_MODEL="Opus 4.7";   H_EFFORT="high"; H_TIER=4
+  elif [ $SCORE -lt 250 ]; then H_MODEL="Opus 4.7";   H_EFFORT="xhigh"; H_TIER=5
+  else                          H_MODEL="Opus 4.7";   H_EFFORT="max";  H_TIER=6
   fi
   echo "$H_MODEL|$H_EFFORT|$H_TIER|score=$SCORE" > "$HEUR_CACHE"
 fi
-IFS='|' read -r REC_MODEL REC_EFFORT REC_TIER REC_REASON < "$HEUR_CACHE"
+IFS='|' read -r REC_MODEL REC_EFFORT REC_TIER REC_REASON < "$HEUR_CACHE" 2>/dev/null
 
 CUR_MODEL_ID=$(j '.model.id // ""')
 CUR_TIER=0
 case "$CUR_MODEL_ID" in
   *haiku*)  CUR_TIER=1 ;;
-  *sonnet*) CUR_TIER=2 ;;
-  *opus*)   CUR_TIER=3 ;;
+  *sonnet*) CUR_TIER=$([[ "$EFFORT" == "high" ]] && echo 3 || echo 2) ;;
+  *opus*)   case "$EFFORT" in
+              high)  CUR_TIER=4 ;;
+              xhigh) CUR_TIER=5 ;;
+              max)   CUR_TIER=6 ;;
+              *)     CUR_TIER=4 ;;
+            esac ;;
 esac
-[ "$EFFORT" = "xhigh" ] && [ "$CUR_TIER" = "3" ] && CUR_TIER=4
 
 if [ "$CUR_TIER" -ge "$REC_TIER" ]; then
   REC_COL=$GREEN
 else
   REC_COL=$YELLOW
 fi
-add "💡 rec: $REC_MODEL/$REC_EFFORT" "${REC_COL}💡 rec: $REC_MODEL/$REC_EFFORT${RESET}"
-fi
+[ -n "$REC_MODEL" ] && add "💡 rec: $REC_MODEL/$REC_EFFORT" "${REC_COL}💡 rec: $REC_MODEL/$REC_EFFORT${RESET}"
 
 pctcol() {
   local p=$1
