@@ -1,6 +1,6 @@
 # Claude Code Statusline
 
-**👨‍💻 פותח על ידי יעקוב מוסרי**
+**👨‍💻 Created by Yaakov Moseri**
 
 Advanced terminal status line for Claude Code with real-time compression mode display, token tracking, git integration, cost monitoring, and full tool autonomy.
 
@@ -232,6 +232,6 @@ Set `model` in settings.json to switch Claude models between sessions. Statuslin
 
 ## 👨‍💻 Author
 
-**👨‍💻 פותח על ידי יעקוב מוסרי** ([GitHub](https://github.com/moseri25))
+**👨‍💻 Created by Yaakov Moseri** ([GitHub](https://github.com/moseri25))
 
 Made for developers who want full control and visibility over their Claude Code workflow.
