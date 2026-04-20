@@ -14,7 +14,7 @@ chmod +x "$CLAUDE_DIR/statusline.sh"
 # Create caveman state file
 echo "🦧 Setting up caveman state..."
 touch "$CLAUDE_DIR/caveman_state"
-echo "full" > "$CLAUDE_DIR/caveman_state"
+echo "ultra" > "$CLAUDE_DIR/caveman_state"
 
 # Update settings.json
 if [ -f "$CLAUDE_DIR/settings.json" ]; then
