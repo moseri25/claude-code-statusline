@@ -26,6 +26,32 @@ Shows active compression level in real-time:
 - **Cost Monitor** — API spend tracking or subscription status
 - **Duration** — Total session runtime
 
+### 🔄 Auto / 🔒 Manual Selection Mode
+Toggle between two model-selection strategies, with the active mode shown live in the statusline:
+
+- **🔄 AUTO** — `auto_select` UserPromptSubmit hook scores each prompt's complexity (length, keywords in English + Hebrew, file mentions, code fences, multi-step markers) and rewrites `~/.claude/settings.json` on the fly: Haiku for chit-chat, Sonnet low→max for real work, Opus low→max for heavy tasks.
+- **🔒 MANUAL** — the hook exits early. Whatever you set with Claude Code's `/model` and `/effort` stays frozen until you toggle back.
+
+Switch modes:
+
+```bash
+~/.claude/toggle_mode.sh          # toggles auto ↔ manual
+```
+
+Or use the included slash command inside Claude Code:
+
+```
+/mode            # toggle
+/mode auto       # force AUTO
+/mode manual     # force MANUAL
+```
+
+The statusline adds a badge:
+```
+🔄 AUTO      (green — auto-selection active)
+🔒 MANUAL    (yellow — model/effort locked)
+```
+
 ### ⚙️ Full Tool Autonomy
 - Bypass permission prompts for non-destructive operations
 - Announces destructive actions before execution
