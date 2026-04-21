@@ -1,18 +1,21 @@
 ---
-name: mode
-description: >
-  Toggle the statusline selection mode between AUTO (model + effort auto-selected
-  per prompt complexity by the auto_select hook) and MANUAL (user's /model and
-  /effort choices stay frozen). Runs ~/.claude/toggle_mode.sh and reports the new state.
-  Triggers: "/mode", "toggle mode", "switch auto/manual", "lock model".
+allowed-tools: Bash(~/.claude/toggle_mode.sh), Bash(cat:*), Bash(echo:*), Bash(jq:*)
+description: Toggle statusline selection mode between AUTO and MANUAL
+argument-hint: "[auto|manual]"
 ---
 
-Run `~/.claude/toggle_mode.sh` using the Bash tool and show the user the output verbatim (it already prints the new mode and current model/effort).
+## Context
 
-If the user passes an argument — `auto` or `manual` — set that mode directly instead of toggling:
-- `auto`: `echo auto > ~/.claude/selection_mode`
-- `manual`: `echo manual > ~/.claude/selection_mode`
+- Current mode: !`cat ~/.claude/selection_mode 2>/dev/null || echo auto`
+- Current model: !`jq -r '.model' ~/.claude/settings.json`
+- Current effort: !`jq -r '.effortLevel' ~/.claude/settings.json`
 
-Then print the resulting state: `cat ~/.claude/selection_mode` plus current model/effort from `~/.claude/settings.json`.
+## Your task
 
-Keep the reply to one or two short lines. No preamble.
+Argument passed: `$ARGUMENTS`
+
+- If argument is `auto`: run `echo auto > ~/.claude/selection_mode`
+- If argument is `manual`: run `echo manual > ~/.claude/selection_mode`
+- If argument is empty: run `~/.claude/toggle_mode.sh` to flip the current mode
+
+Then report the new mode in one short line along with current model/effort.
