@@ -90,6 +90,8 @@ if [ -f ~/.claude/caveman_state ]; then
   CAVEMAN_LEVEL=$(cat ~/.claude/caveman_state 2>/dev/null)
 fi
 
+SELECTION_MODE=$(cat ~/.claude/selection_mode 2>/dev/null || echo "auto")
+
 # Auto-picked target model (written by UserPromptSubmit hook)
 CUR_MODEL_ID_RAW=$(j '.model.id // ""')
 TARGET_ID=$(jq -r '.model // empty' ~/.claude/settings.json 2>/dev/null)
@@ -252,6 +254,12 @@ if [ -n "$THINKING_LABEL" ]; then
 fi
 [ -n "$VERSION" ] && add "v$VERSION" "${GRAY}v$VERSION${RESET}"
 [ -n "$CAVEMAN_LEVEL" ] && add "🦧caveman - $CAVEMAN_LEVEL" "${YELLOW}🦧caveman - $CAVEMAN_LEVEL${RESET}"
+
+if [ "$SELECTION_MODE" = "manual" ]; then
+  add "🔒 MANUAL" "${YELLOW}🔒 MANUAL${RESET}"
+else
+  add "🔄 AUTO" "${GREEN}🔄 AUTO${RESET}"
+fi
 add "📁 ${DIR##*/}" "${CYAN}📁 ${DIR##*/}${RESET}"
 add "$GB_PLAIN" "$GB_COL"
 brk

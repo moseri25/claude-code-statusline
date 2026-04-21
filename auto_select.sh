@@ -5,6 +5,14 @@
 
 SETTINGS="$HOME/.claude/settings.json"
 LOG="$HOME/.claude/hooks/auto_select.log"
+MODE_FILE="$HOME/.claude/selection_mode"
+
+# In manual mode, skip auto-selection entirely
+MODE=$(cat "$MODE_FILE" 2>/dev/null || echo "auto")
+if [ "$MODE" = "manual" ]; then
+  echo "$(date -Iseconds) mode=manual skip" >> "$LOG"
+  exit 0
+fi
 
 input=$(cat)
 prompt=$(echo "$input" | jq -r '.prompt // ""')
