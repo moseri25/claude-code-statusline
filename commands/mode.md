@@ -1,21 +1,16 @@
 ---
-allowed-tools: Bash(~/.claude/toggle_mode.sh), Bash(cat:*), Bash(echo:*), Bash(jq:*)
 description: Toggle statusline selection mode between AUTO and MANUAL
-argument-hint: "[auto|manual]"
+argument-hint: [auto|manual]
 ---
 
-## Context
+Toggle or set the selection mode that controls whether the auto_select hook auto-picks model/effort.
 
-- Current mode: !`cat ~/.claude/selection_mode 2>/dev/null || echo auto`
-- Current model: !`jq -r '.model' ~/.claude/settings.json`
-- Current effort: !`jq -r '.effortLevel' ~/.claude/settings.json`
+Argument passed: $ARGUMENTS
 
-## Your task
+Steps:
+1. If `$ARGUMENTS` is `auto`, run: `echo auto > ~/.claude/selection_mode`
+2. If `$ARGUMENTS` is `manual`, run: `echo manual > ~/.claude/selection_mode`
+3. Otherwise run: `~/.claude/toggle_mode.sh`
 
-Argument passed: `$ARGUMENTS`
-
-- If argument is `auto`: run `echo auto > ~/.claude/selection_mode`
-- If argument is `manual`: run `echo manual > ~/.claude/selection_mode`
-- If argument is empty: run `~/.claude/toggle_mode.sh` to flip the current mode
-
-Then report the new mode in one short line along with current model/effort.
+After the change, read `~/.claude/selection_mode` and print one short line like:
+`🔒 MANUAL — model=claude-opus-4-7 effort=max` (or AUTO), using values from `~/.claude/settings.json`.
