@@ -1,264 +1,146 @@
 # Claude Code Statusline
 
-**👤 Created by Yaakov Moseri**
+> Advanced, information-dense status line for [Claude Code](https://claude.com/claude-code) — model & thinking effort, context usage, 5h/7d rate-limit bars with token counts and reset countdowns, live git status, subscription/API mode, and an optional **AUTO** model selector that picks the right model per prompt.
 
-Advanced terminal status line for Claude Code with real-time compression mode display, token tracking, git integration, cost monitoring, and full tool autonomy.
+Created by **Yaakov Moseri**.
 
-Built for developers using Claude Code in Termux and other terminal environments.
+```
+👤 Created by Yaakov Moseri
+[Opus 4.8] 🧠⚡ xhigh v2.0.14 🦧caveman - off 🔄 AUTO 📁 my-project 🌿 main 🟢0 🔴0 🟡2
+5h  ████████░░░░ 64%  🪙 1.2M  ⏳2h 13m
+7d  ███░░░░░░░░░ 28%  🪙 8.4M  ⏳5d 4h
+✅ Subscription Active                              ⏱️ 1h 22m
+```
 
-## 🎯 Features
+Works everywhere Claude Code runs — desktop, and mobile (Termux / proot) where it was tuned to render cleanly on a ~40-column phone screen.
 
-### 🦧 Caveman Mode Display
-Shows active compression level in real-time:
-- `lite` — Ultra-compressed, minimal tokens
-- `full` — Balanced compression
-- `ultra` — Maximum compression (default)
-- `wenyan-lite` — Ancient Chinese style, lite
-- `wenyan-full` — Ancient Chinese style, full  
-- `wenyan-ultra` — Ancient Chinese style, ultra
+---
 
-### 📊 Real-time Status Information
-- **Model** — Current Claude model (Haiku, Sonnet, Opus)
-- **Effort Level** — Request complexity level (low, medium, high, xhigh)
-- **Directory** — Current working directory
-- **Git Branch** — Active git branch with status indicators
-- **Token Usage** — 5-hour and 7-day rate limit display with visual bars
-- **Cost Monitor** — API spend tracking or subscription status
-- **Duration** — Total session runtime
+## What it shows
 
-### 🔄 Auto / 🔒 Manual Selection Mode
-Toggle between two model-selection strategies, with the active mode shown live in the statusline:
+| Segment | Meaning |
+| --- | --- |
+| `[Opus 4.8]` | Live running model (`display_name` from the payload). Shows `→ Target` when AUTO has queued a different model for the next turn. |
+| `🧠 / 🧠⚡` | Thinking effort (`low` / `medium` / `high` / `xhigh` / `max`), validated against what each model actually supports. |
+| `v2.0.14` | Claude Code version. |
+| `🦧 caveman` | Optional [caveman mode](#optional-caveman-mode) state. |
+| `🔄 AUTO` / `🔒 MANUAL` | Model-selection mode (see [AUTO vs MANUAL](#auto-vs-manual-model-selection)). |
+| `📁 dir 🌿 branch` | Current directory + git branch with three traffic lights: 🟢 ahead · 🔴 behind · 🟡 modified. |
+| `5h` / `7d` bars | Rate-limit usage bars (green→yellow→red), `🪙` token totals for the window, and `⏳` countdown to reset. |
+| `✅ Subscription` / `🔑 API` | Whether you're on a subscription or billing the API (auto-detected from `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN` / `ANTHROPIC_BASE_URL`). |
+| `⏱️ 1h 22m` | Total session duration. |
 
-- **🔄 AUTO** — `auto_select` UserPromptSubmit hook scores each prompt's complexity (length, keywords in English + Hebrew, file mentions, code fences, multi-step markers) and rewrites `~/.claude/settings.json` on the fly: Haiku for chit-chat, Sonnet low→max for real work, Opus low→max for heavy tasks.
-- **🔒 MANUAL** — the hook exits early. Whatever you set with Claude Code's `/model` and `/effort` stays frozen until you toggle back.
+All live data (cost, rate limits, context window) is cached to `~/.claude/token_cache.json` so the line never flashes zeros on idle refreshes.
 
-Switch modes:
+---
+
+## Requirements
+
+- **Claude Code** (the line is wired through `settings.json`)
+- **`jq`** — JSON parsing (required)
+- **`python3`** — token summation across transcripts (required for the `🪙` counts)
+- **`git`** — for the git segment (optional)
+
+---
+
+## Install (one command)
 
 ```bash
-~/.claude/toggle_mode.sh          # toggles auto ↔ manual
+curl -fsSL https://raw.githubusercontent.com/moseri25/claude-code-statusline/main/install.sh | bash
 ```
 
-Or use the included slash command inside Claude Code:
+The installer:
+1. Copies the scripts into `~/.claude/` (`statusline.sh`, `total_tokens.sh`, `toggle_mode.sh`), the hooks into `~/.claude/hooks/`, and the `/mode` skill into `~/.claude/skills/mode/`.
+2. Backs up your existing `~/.claude/settings.json` (timestamped) and **merges** in the `statusLine` command and the `UserPromptSubmit` hooks — idempotently, so re-running it won't create duplicates.
+3. Makes everything executable.
 
-```
-/mode            # toggle
-/mode auto       # force AUTO
-/mode manual     # force MANUAL
-```
+Then **restart Claude Code** (or start a new session) to see the line.
 
-The statusline adds a badge:
-```
-🔄 AUTO      (green — auto-selection active)
-🔒 MANUAL    (yellow — model/effort locked)
-```
+> Honors `CLAUDE_CONFIG_DIR` if you keep your config somewhere other than `~/.claude`.
 
-### ⚙️ Full Tool Autonomy
-- Bypass permission prompts for non-destructive operations
-- Announces destructive actions before execution
-- Streamlined workflow without constant approvals
+---
 
-### 🎨 Visual Indicators
-- Colored segments for quick status scanning
-- Progress bars for rate limits (█░ format)
-- Git status icons (±modified, ↑ahead, ↓behind)
-- Emoji indicators for mode and features
-
-## 📦 Quick Install
+## Manual install
 
 ```bash
 git clone https://github.com/moseri25/claude-code-statusline.git
 cd claude-code-statusline
-bash install.sh
+./install.sh
 ```
 
-Then restart Claude Code to see the statusline in action.
+Or wire it by hand — copy the files and add this to `~/.claude/settings.json`
+(see [`settings.example.json`](settings.example.json)):
 
-## 📋 What Gets Installed
-
-The installation script automatically:
-- ✅ Copies `statusline.sh` to `~/.claude/`
-- ✅ Creates `~/.claude/caveman_state` (defaults to `ultra`)
-- ✅ Updates `~/.claude/settings.json` with statusline command
-- ✅ Enables full tool autonomy in `settings.local.json`
-- ✅ Sets proper permissions (755) on scripts
-
-## 🎮 Using Caveman Compression Modes
-
-Switch compression level anytime by asking Claude:
-
-```
-"caveman ultra"      # Maximum compression
-"caveman full"       # Balanced (medium compression)
-"caveman lite"       # Minimal compression
-"caveman wenyan-ultra" # Ancient Chinese, maximum
-```
-
-The statusline updates instantly showing your active mode:
-```
-🦧caveman - ultra
-```
-
-## 📊 Status Line Display
-
-### Example Output
-```
-[Opus 4.7] 🧠xhigh | 📁 project | 🌿 main ±0 ↑0 ↓0
-5h ███░░░░░░ 35% 🪙156.2K
-7d █████░░░░ 50% 🪙1.2M
-✅ Subscription Active | ⏱️ 45m
-```
-
-### Color Scheme
-- 🟢 **Green** — Normal/optimal state
-- 🟡 **Yellow** — Warnings (high usage, git changes)
-- 🔴 **Red** — Critical (>90% rate limit)
-- ⚪ **Gray** — Disabled/unavailable features
-
-## 🔧 Configuration
-
-### Customize Colors
-Edit `~/.claude/statusline.sh` lines 10-11:
-```bash
-CYAN='\033[36m'
-GREEN='\033[32m'
-YELLOW='\033[33m'
-RED='\033[31m'
-```
-
-### Change Default Caveman Level
-Edit `install.sh` before running:
-```bash
-echo "lite" > "$CLAUDE_DIR/caveman_state"  # or "full", "ultra"
-```
-
-### Modify Status Segments
-Edit the `add` commands in `statusline.sh` (lines 163-186) to customize what displays.
-
-## 🛠️ Manual Setup (if install.sh fails)
-
-### 1. Copy Statusline Script
-```bash
-cp statusline.sh ~/.claude/statusline.sh
-chmod +x ~/.claude/statusline.sh
-```
-
-### 2. Add to Settings
-Create/edit `~/.claude/settings.json`:
-```json
+```jsonc
 {
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh"
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      { "hooks": [
+        { "type": "command", "command": "~/.claude/hooks/auto_select.sh" },
+        { "type": "command", "command": "~/.claude/hooks/caveman_state.sh" },
+        { "type": "command", "command": "~/.claude/hooks/cache_status.sh" }
+      ] }
+    ]
   }
 }
 ```
-
-### 3. Setup Caveman State
-```bash
-echo "ultra" > ~/.claude/caveman_state
-```
-
-### 4. Enable Tool Autonomy
-Create/edit `~/.claude/settings.local.json`:
-```json
-{
-  "permissions": {
-    "defaultMode": "bypassPermissions"
-  }
-}
-```
-
-## 📋 Requirements
-
-- **Claude Code** (web, desktop, or CLI)
-- **bash** 4.0+
-- **jq** (JSON query tool)
-- **git** (for branch display)
-- **tput** (terminal info - usually included)
-
-## 🐛 Troubleshooting
-
-### Status line not showing
-- Restart Claude Code completely
-- Verify `~/.claude/statusline.sh` has execute permission: `ls -la ~/.claude/statusline.sh`
-- Check `settings.json` points to correct path
-
-### Caveman mode not displaying
-- Create file: `touch ~/.claude/caveman_state`
-- Add content: `echo "ultra" > ~/.claude/caveman_state`
-- Ask Claude to switch: "caveman ultra"
-
-### Permissions still prompting
-- Ensure `settings.local.json` has `"defaultMode": "bypassPermissions"`
-- Check syntax is valid JSON
-- Restart Claude Code
-
-### Rate limit bars not showing
-- Ensure `jq` is installed: `command -v jq`
-- Check `~/.claude/settings.json` has rate limit tracking enabled
-
-## 🔐 Security Notes
-
-- statusline.sh is read-only and non-destructive
-- No credentials stored in statusline
-- Token display is always truncated for security
-- Install script creates proper file permissions (600 for state files)
-
-## 📚 Files Included
-
-- `statusline.sh` — Main status line display script (11KB)
-- `install.sh` — Automated installation script
-- `README.md` — This documentation
-- `LICENSE` — MIT license
-- `.gitignore` — Standard git ignore rules
-
-## 🤝 Contributing
-
-Found a bug or want to improve it? 
-1. Fork the repo
-2. Create a feature branch
-3. Submit a pull request
-
-## 📄 License
-
-MIT License — Free to use and modify
-
-## 💡 Tips & Tricks
-
-### Use with Multiple Terminals
-Each terminal runs its own Claude Code session, so each gets its own statusline display. Perfect for parallel work!
-
-### Combine with Aliases
-```bash
-alias cc='claude-code'  # Quick launch
-alias ccf='claude --model opus-4-7 --effort xhigh'  # Fast mode
-```
-
-### Monitor Rate Limits
-Watch the 5h and 7d bars in the statusline to stay under rate limits. Red means you're above 90% usage.
-
-### Switch Models on the Fly
-Set `model` in settings.json to switch Claude models between sessions. Statusline shows the active model.
-
-## 🆘 Support
-
-- **Issues**: Open a GitHub issue with details about your setup
-- **Questions**: Check this README for troubleshooting section first
-- **Feature Requests**: Describe your use case in a GitHub discussion
-
-## 🌟 Highlights
-
-- **Tiny & Fast** — Single bash script, minimal overhead
-- **Works Everywhere** — Termux, macOS, Linux, Windows (WSL)
-- **Zero Dependencies** — Just bash, jq, and git
-- **Fully Customizable** — Edit colors, layout, segments
-- **Privacy First** — No external APIs, all local
 
 ---
 
-## 👤 Author
+## How it works
 
-**👤 Created by Yaakov Moseri** ([GitHub](https://github.com/moseri25))
+- **`statusline.sh`** — the renderer. Claude Code pipes the live status payload to it on stdin every refresh; it parses with `jq`, merges in cached rate-limits (the live payload omits them on idle refreshes), and prints a width-aware, color-coded line.
+- **`total_tokens.sh`** — sums `input + output + cache` tokens across all `~/.claude/projects/*/*.jsonl` transcripts into 5h / 7d / all-time totals (cached 60s).
+- **`hooks/cache_status.sh`** — `UserPromptSubmit` hook that persists the working directory so the git segment resolves even on empty refreshes.
+- **`hooks/auto_select.sh`** — the AUTO brain (below).
+- **`hooks/caveman_state.sh`** — tracks optional caveman-mode state.
 
-Made for developers who want full control and visibility over their Claude Code workflow.
-# test2
+### AUTO vs MANUAL model selection
+
+In **AUTO** mode, `auto_select.sh` scores each prompt (length, complexity keywords in English **and Hebrew**, file mentions, code fences, multi-step markers) and rewrites `model` + `effortLevel` in `settings.json` — small talk → Haiku, everyday work → Sonnet, heavy/complex work → Opus with higher effort.
+
+Toggle with the bundled **`/mode`** skill:
+
+```
+/mode            # toggle
+/mode auto       # let prompts pick the model
+/mode manual     # freeze model/effort; you control /model and /effort
+```
+
+`🔒 MANUAL` in the line means auto-selection is off.
+
+### Customization
+
+Set these env vars in your shell:
+
+| Variable | Effect |
+| --- | --- |
+| `CLAUDE_STATUSLINE_NARROW=1` | Compact layout for very narrow terminals. |
+| `CLAUDE_STATUSLINE_COLS=100` | Wrap width (default `40`, tuned for phones; raise on desktop). |
+
+### Optional: caveman mode
+
+`caveman_state.sh` and the `🦧` segment integrate with a separate caveman-mode toolset. The statusline works fully without it — the segment just reads `off`.
+
+---
+
+## Uninstall
+
+```bash
+rm -f ~/.claude/statusline.sh ~/.claude/total_tokens.sh ~/.claude/toggle_mode.sh
+rm -f ~/.claude/hooks/auto_select.sh ~/.claude/hooks/cache_status.sh ~/.claude/hooks/caveman_state.sh
+rm -rf ~/.claude/skills/mode
+```
+
+Then remove the `statusLine` and `UserPromptSubmit` entries from `~/.claude/settings.json`
+(a timestamped backup was saved at install time).
+
+---
+
+## License
+
+[MIT](LICENSE) © Yaakov Moseri

@@ -1,0 +1,17 @@
+{
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/statusline.sh"
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "~/.claude/hooks/auto_select.sh" },
+          { "type": "command", "command": "~/.claude/hooks/caveman_state.sh" },
+          { "type": "command", "command": "~/.claude/hooks/cache_status.sh" }
+        ]
+      }
+    ]
+  }
+}

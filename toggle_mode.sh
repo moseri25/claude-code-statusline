@@ -7,6 +7,14 @@ current=$(cat "$MODE_FILE" 2>/dev/null || echo "auto")
 
 if [ "$current" = "auto" ]; then
   echo "manual" > "$MODE_FILE"
+
+  # Seed a valid effortLevel if missing/null so the statusline reflects real state
+  cur_effort=$(jq -r '.effortLevel // empty' "$SETTINGS" 2>/dev/null)
+  if [ -z "$cur_effort" ]; then
+    tmp=$(mktemp)
+    jq '.effortLevel = "xhigh"' "$SETTINGS" > "$tmp" && mv "$tmp" "$SETTINGS"
+  fi
+
   echo "🔒 MANUAL mode — model/effort frozen, auto-selection disabled."
   echo "   Use /model and /effort in Claude Code to change manually."
   echo "   Current: model=$(jq -r '.model' "$SETTINGS") effort=$(jq -r '.effortLevel' "$SETTINGS")"

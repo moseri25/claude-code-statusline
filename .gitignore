@@ -1,7 +1,10 @@
-.DS_Store
-*.swp
-*.swo
-*~
-.vscode/
-.idea/
+# runtime state / caches — never commit
+token_cache.json
+git_cache.json
+workspace_cache.txt
+selection_mode
+caveman_state
 *.log
+*.bak
+*.bak.*
+.cache/

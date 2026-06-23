@@ -3,24 +3,72 @@
 # Created by Yaakov Moseri
 # https://github.com/moseri25/claude-code-statusline
 
-# Try to read cached status first (for real-time display without messages)
+# Read the live statusLine payload from stdin. When Claude Code refreshes the
+# line outside an active turn it can pass empty/partial JSON, so we keep a
+# last-known-good cache and fall back to it instead of rendering zeros.
+# NOTE: the cache is written HERE because the statusLine command is the only
+# place that actually receives cost/rate_limits/context_window — the
+# UserPromptSubmit hook never sees those fields.
 CACHE="$HOME/.claude/token_cache.json"
-if [ -f "$CACHE" ] && [ -s "$CACHE" ]; then
-  # Only use cache if it has real data (not nulls)
-  COST=$(jq -r '.cost.total_cost_usd // null' "$CACHE" 2>/dev/null)
-  if [ "$COST" != "null" ] && [ -n "$COST" ]; then
-    input=$(cat "$CACHE")
-  else
-    input=$(cat)  # Cache is empty, read from stdin
+STDIN_JSON=$(cat)
+STDIN_COST=$(echo "$STDIN_JSON" | jq -r '.cost.total_cost_usd // empty' 2>/dev/null)
+if [ -n "$STDIN_COST" ]; then
+  # Live data present. The live statusLine payload does NOT always include
+  # rate_limits — when it's absent (common on idle / out-of-turn refreshes) the
+  # 5h/7d reset countdowns would blink out, and the cache would then get
+  # overwritten with null, making them disappear persistently. So MERGE: prefer
+  # live fields, but fall back to the last cached rate_limits when the live
+  # payload omits them. resets_at is an absolute time, so a slightly stale value
+  # is still correct (the countdown is recomputed against "now" every render).
+  input="$STDIN_JSON"
+  STDIN_RL=$(echo "$STDIN_JSON" | jq -r '.rate_limits.five_hour.resets_at // .rate_limits.seven_day.resets_at // empty' 2>/dev/null)
+  if [ -z "$STDIN_RL" ] && [ -f "$CACHE" ]; then
+    CACHED_RL=$(jq -c '.rate_limits // empty' "$CACHE" 2>/dev/null)
+    if [ -n "$CACHED_RL" ] && [ "$CACHED_RL" != "null" ]; then
+      MERGED=$(echo "$STDIN_JSON" | jq --argjson rl "$CACHED_RL" '.rate_limits = $rl' 2>/dev/null)
+      [ -n "$MERGED" ] && input="$MERGED"
+    fi
   fi
+  # Refresh the cache (throttled to >=2s) from the MERGED input, so the cached
+  # rate_limits are never clobbered with null and the timers survive.
+  CAGE=9999; [ -f "$CACHE" ] && CAGE=$(( $(date +%s) - $(stat -c %Y "$CACHE" 2>/dev/null || echo 0) ))
+  if [ "$CAGE" -ge 2 ]; then
+    echo "$input" | jq '{
+      timestamp:(now|todate), cost:.cost, context_window:.context_window,
+      rate_limits:.rate_limits, model:.model, workspace:.workspace,
+      version:.version, cwd:.cwd
+    }' > "$CACHE" 2>/dev/null
+  fi
+elif [ -f "$CACHE" ] && [ -s "$CACHE" ] && \
+     [ -n "$(jq -r '.cost.total_cost_usd // empty' "$CACHE" 2>/dev/null)" ]; then
+  input=$(cat "$CACHE")
 else
-  input=$(cat)
+  input="$STDIN_JSON"
 fi
 
 # ---- terminal width ----
 COLS=${COLUMNS:-0}
 [ "$COLS" -eq 0 ] && COLS=$(tput cols 2>/dev/null || echo 40)
 [ "$COLS" -lt 20 ] && COLS=40
+# ---- layout ----
+# WIDE is the default EVERYWHERE (Termux, proot, desktop) — the full content
+# from the reference screenshot: "Created by" header, model/effort/version,
+# dir/git, 12-wide 5h+7d bars with 🪙tokens and ⏳reset countdowns, then
+# subscription/API + ⏱️timer. This must NOT depend on $TERMUX_VERSION, which is
+# unset inside the proot container where Claude Code actually runs.
+# Opt into the old compact view per-shell with:  export CLAUDE_STATUSLINE_NARROW=1
+NARROW=0
+ULTRA_NARROW=0
+if [ -n "$CLAUDE_STATUSLINE_NARROW" ]; then
+  NARROW=1
+  [ "$COLS" -lt 32 ] && ULTRA_NARROW=1
+fi
+# Clamp the wrap width to the visible viewport. Termux/proot on mobile (and
+# Claude Code's reported COLUMNS) can over-report width, pushing wide lines
+# off-screen. ~40 cols renders the screenshot layout as clean, non-wrapping
+# lines on a phone. Raise on a wide desktop: export CLAUDE_STATUSLINE_COLS=100
+WRAP=${CLAUDE_STATUSLINE_COLS:-40}
+[ "$COLS" -gt "$WRAP" ] && COLS=$WRAP
 
 # ---- colors ----
 CYAN='\033[36m'; GREEN='\033[32m'; YELLOW='\033[33m'; RED='\033[31m'
@@ -31,7 +79,11 @@ j() { echo "$input" | jq -r "$1"; }
 # ---- fields ----
 MODEL=$(j '.model.display_name')
 VERSION=$(j '.version // ""')
-DIR=$(j '.workspace.current_dir')
+DIR=$(j '.workspace.current_dir // .cwd // ""')
+# Fall back to the last persisted workspace so an empty refresh never shows "null".
+if [ -z "$DIR" ] || [ "$DIR" = "null" ]; then
+  DIR=$(cat "$HOME/.claude/workspace_cache.txt" 2>/dev/null)
+fi
 COST=$(j '.cost.total_cost_usd // 0')
 PCT=$(j '.context_window.used_percentage // 0' | cut -d. -f1)
 DURATION_MS=$(j '.cost.total_duration_ms // 0')
@@ -99,8 +151,13 @@ target_display() {
   case "$1" in
     *haiku*)  echo "Haiku 4.5" ;;
     *sonnet*) echo "Sonnet 4.6" ;;
-    *opus*)   echo "Opus 4.7" ;;
+    *opus*)   echo "Opus 4.8" ;;
     *)        echo "$1" ;;
+  esac
+}
+model_family() {
+  case "$1" in
+    *haiku*) echo "haiku" ;; *sonnet*) echo "sonnet" ;; *opus*) echo "opus" ;; *) echo "" ;;
   esac
 }
 TARGET_DISPLAY=$(target_display "$TARGET_ID")
@@ -140,9 +197,12 @@ fmt_tok() {
 TOK_DAY_F=$(fmt_tok $T_DAY)
 TOK_WEEK_F=$(fmt_tok $T_WEEK)
 
+BAR_WIDTH=12
+[ "$NARROW" = "1" ] && BAR_WIDTH=5
+[ "$ULTRA_NARROW" = "1" ] && BAR_WIDTH=3
 make_bar() {
   local pct=$1
-  local f=$(( pct*12/100 )); [ $f -gt 12 ] && f=12; local e=$((12-f))
+  local f=$(( pct*BAR_WIDTH/100 )); [ $f -gt $BAR_WIDTH ] && f=$BAR_WIDTH; local e=$((BAR_WIDTH-f))
   printf -v FP "%${f}s" ""; printf -v EP "%${e}s" ""
   echo "${FP// /█}${EP// /░}"
 }
@@ -162,35 +222,49 @@ TOTAL_M=$((DURATION_MS/60000))
 H=$((TOTAL_M/60)); M=$((TOTAL_M%60))
 if [ $H -gt 0 ]; then DUR_STR="${H}h ${M}m"; else DUR_STR="${M}m"; fi
 
-# ---- git ---- (read from cache first for real-time updates)
+# ---- git ---- live status for the ACTUAL current dir (no stale cross-dir cache).
+# The cache is keyed by dir and only trusted for <3s, so the branch/counts are
+# real for the current repo and we never show a leftover branch from another dir
+# (or from a dir that is not a repo at all).
 GIT_CACHE="$HOME/.claude/git_cache.json"
 GB=""; GM=0; GAHEAD=0; GBEHIND=0
+GC_DIR=""; GC_AGE=9999
+if [ -n "$DIR" ] && [ -f "$GIT_CACHE" ]; then
+  GC_DIR=$(jq -r '.dir // ""' "$GIT_CACHE" 2>/dev/null)
+  GC_AGE=$(( $(date +%s) - $(stat -c %Y "$GIT_CACHE" 2>/dev/null || echo 0) ))
+fi
 
-if [ -f "$GIT_CACHE" ] && [ -s "$GIT_CACHE" ]; then
-  # Try to read from cache
+if [ -n "$DIR" ] && [ "$GC_DIR" = "$DIR" ] && [ "$GC_AGE" -lt 3 ]; then
+  # Fresh same-dir cache: reuse without spawning git (keeps refreshes snappy).
+  GB=$(jq -r '.branch // ""' "$GIT_CACHE" 2>/dev/null)
+  GM=$(jq -r '.modified_files // 0' "$GIT_CACHE" 2>/dev/null)
+  GAHEAD=$(jq -r '.ahead // 0' "$GIT_CACHE" 2>/dev/null)
+  GBEHIND=$(jq -r '.behind // 0' "$GIT_CACHE" 2>/dev/null)
+elif [ -n "$DIR" ] && git -C "$DIR" rev-parse --git-dir >/dev/null 2>&1; then
+  GB=$(git -C "$DIR" branch --show-current 2>/dev/null)
+  [ -z "$GB" ] && GB=$(git -C "$DIR" rev-parse --short HEAD 2>/dev/null)
+  GM=$(git -C "$DIR" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+  GAB=$(git -C "$DIR" rev-list --left-right --count '@{u}...HEAD' 2>/dev/null)
+  if [ -n "$GAB" ]; then
+    GBEHIND=$(echo "$GAB" | awk '{print $1}')
+    GAHEAD=$(echo "$GAB" | awk '{print $2}')
+  fi
+  jq -n --arg dir "$DIR" --arg b "$GB" --arg f "$GM" --arg a "$GAHEAD" --arg be "$GBEHIND" \
+    '{timestamp:(now|todate),dir:$dir,branch:$b,modified_files:($f|tonumber),ahead:($a|tonumber),behind:($be|tonumber)}' \
+    > "$GIT_CACHE" 2>/dev/null
+elif [ -n "$DIR" ] && [ "$GC_DIR" = "$DIR" ]; then
+  # Live check failed but we have a same-dir cache (any age): better than blank.
   GB=$(jq -r '.branch // ""' "$GIT_CACHE" 2>/dev/null)
   GM=$(jq -r '.modified_files // 0' "$GIT_CACHE" 2>/dev/null)
   GAHEAD=$(jq -r '.ahead // 0' "$GIT_CACHE" 2>/dev/null)
   GBEHIND=$(jq -r '.behind // 0' "$GIT_CACHE" 2>/dev/null)
 fi
 
-# Fallback to live git check if cache missing
-if [ -z "$GB" ] && git -C "$DIR" rev-parse --git-dir >/dev/null 2>&1; then
-  GB=$(git -C "$DIR" branch --show-current 2>/dev/null)
-  [ -z "$GB" ] && GB=$(git -C "$DIR" rev-parse --short HEAD 2>/dev/null)
-  GM=$(git -C "$DIR" status --porcelain 2>/dev/null | wc -l)
-  GAB=$(git -C "$DIR" rev-list --left-right --count '@{u}...HEAD' 2>/dev/null)
-  GAHEAD=0; GBEHIND=0
-  if [ -n "$GAB" ]; then
-    GBEHIND=$(echo "$GAB" | awk '{print $1}')
-    GAHEAD=$(echo "$GAB" | awk '{print $2}')
-  fi
-fi
-
 if [ -n "$GB" ]; then
-  GX=" ±${GM} ↑${GAHEAD} ↓${GBEHIND}"
-  # color: ± yellow, ↑ green, ↓ red
-  GX_COL=" ${YELLOW}±${GM}${RESET} ${GREEN}↑${GAHEAD}${RESET} ${RED}↓${GBEHIND}${RESET}"
+  # Three git traffic lights, always shown (read "three zeros" when all clear):
+  #   🟢 ahead  (commits to push)   🔴 behind (commits to pull)   🟡 modified (dirty files)
+  GX=" 🟢${GAHEAD} 🔴${GBEHIND} 🟡${GM}"
+  GX_COL=" ${GREEN}🟢${GAHEAD}${RESET} ${RED}🔴${GBEHIND}${RESET} ${YELLOW}🟡${GM}${RESET}"
   GB_PLAIN="🌿 ${GB:-?}${GX}"
   GB_COL="${GREEN}🌿 ${GB:-?}${RESET}${GX_COL}"
 else
@@ -234,11 +308,22 @@ seg_color=()
 add() { seg_plain+=("$1"); seg_color+=("$2"); }
 brk() { seg_plain+=("__BREAK__"); seg_color+=("__BREAK__"); }
 
-add "👤 Created by Yaakov Moseri" "${GRAY}👤 Created by Yaakov Moseri${RESET}"
-brk
-# show actual current model (from settings.json after auto_select hook)
-# + project recommendation for future prompts
-if [ -n "$TARGET_DISPLAY" ]; then
+if [ "$NARROW" = "0" ]; then
+  add "👤 Created by Yaakov Moseri" "${GRAY}👤 Created by Yaakov Moseri${RESET}"
+  brk
+fi
+# Show the REAL running model name (.model.display_name from the live payload),
+# so it stays correct across version bumps instead of a hardcoded label. Only
+# show "→ target" when auto_select has queued a different model family next turn.
+CUR_FAM=$(model_family "$CUR_MODEL_ID_RAW")
+TGT_FAM=$(model_family "$TARGET_ID")
+if [ -n "$MODEL" ] && [ "$MODEL" != "null" ]; then
+  if [ -n "$TGT_FAM" ] && [ -n "$CUR_FAM" ] && [ "$TGT_FAM" != "$CUR_FAM" ]; then
+    add "[$MODEL → $TARGET_DISPLAY]" "${CYAN}[$MODEL → $TARGET_DISPLAY]${RESET}"
+  else
+    add "[$MODEL]" "${CYAN}[$MODEL]${RESET}"
+  fi
+elif [ -n "$TARGET_DISPLAY" ]; then
   add "[$TARGET_DISPLAY]" "${CYAN}[$TARGET_DISPLAY]${RESET}"
 else
   add "[$MODEL]" "${CYAN}[$MODEL]${RESET}"
@@ -252,15 +337,27 @@ if [ -n "$THINKING_LABEL" ]; then
     add "$THINKING_LABEL" "${MAGENTA}$THINKING_LABEL${RESET}"
   fi
 fi
-[ -n "$VERSION" ] && add "v$VERSION" "${GRAY}v$VERSION${RESET}"
-[ -n "$CAVEMAN_LEVEL" ] && add "🦧caveman - $CAVEMAN_LEVEL" "${YELLOW}🦧caveman - $CAVEMAN_LEVEL${RESET}"
+[ -n "$VERSION" ] && [ "$NARROW" = "0" ] && add "v$VERSION" "${GRAY}v$VERSION${RESET}"
+if [ -n "$CAVEMAN_LEVEL" ]; then
+  add "🦧$CAVEMAN_LEVEL" "${YELLOW}🦧$CAVEMAN_LEVEL${RESET}"
+elif [ "$NARROW" = "1" ]; then
+  add "🦧off" "${GRAY}🦧off${RESET}"
+else
+  add "🦧caveman - off" "${GRAY}🦧caveman - off${RESET}"
+fi
 
 if [ "$SELECTION_MODE" = "manual" ]; then
   add "🔒 MANUAL" "${YELLOW}🔒 MANUAL${RESET}"
-else
+elif [ "$NARROW" = "0" ]; then
   add "🔄 AUTO" "${GREEN}🔄 AUTO${RESET}"
 fi
-add "📁 ${DIR##*/}" "${CYAN}📁 ${DIR##*/}${RESET}"
+
+# Project-specific preferences (ShieldGate)
+if [[ "$DIR" == *"shieldgate"* ]]; then
+  add "📁 ShieldGate" "${YELLOW}📁 ShieldGate${RESET}"
+else
+  add "📁 ${DIR##*/}" "${CYAN}📁 ${DIR##*/}${RESET}"
+fi
 add "$GB_PLAIN" "$GB_COL"
 brk
 RL5_TIME=""; RL5_DATE=""
@@ -280,15 +377,31 @@ RL7_IN_DISPLAY=""; RL7_IN_COL=""
 # add_rr: right-aligned solo line
 add_rr() { seg_plain+=("__RR__${1}"); seg_color+=("__RR__${2}"); }
 
-add "5h  ${BAR5} ${RL5_PCT:-0}%  🪙${TOK_DAY_F}  ${RL5_IN_DISPLAY}" "${CYAN}5h${RESET}  ${BC5}${BAR5}${RESET} ${BC5}${RL5_PCT:-0}%${RESET}  🪙${TOK_DAY_F}  ${RL5_IN_COL}"
-brk
-add "7d  ${BAR7} ${RL7_PCT:-0}%  🪙${TOK_WEEK_F}  ${RL7_IN_DISPLAY}" "${MAGENTA}7d${RESET}  ${BC7}${BAR7}${RESET} ${BC7}${RL7_PCT:-0}%${RESET}  🪙${TOK_WEEK_F}  ${RL7_IN_COL}"
-if [ "$API_ACTIVE" = "1" ]; then
-  add "${COST_FMT} ${API_PLAIN}" "${YELLOW}${COST_FMT}${RESET} ${API_COL}"
+if [ "$NARROW" = "1" ]; then
+  # Bars grow green→yellow→red as usage climbs; tokens + timer alongside
+  add "5h${BAR5}${RL5_PCT:-0}%" "${BC5}5h${BAR5}${RESET}${BC5}${RL5_PCT:-0}%${RESET}"
+  add "7d${BAR7}${RL7_PCT:-0}%" "${BC7}7d${BAR7}${RESET}${BC7}${RL7_PCT:-0}%${RESET}"
+  brk
+  add "🪙5h ${TOK_DAY_F}" "🪙5h ${TOK_DAY_F}"
+  add "🪙7d ${TOK_WEEK_F}" "🪙7d ${TOK_WEEK_F}"
+  if [ "$API_ACTIVE" = "1" ]; then
+    add "🔑API" "${YELLOW}🔑API${RESET}"
+    add "${COST_FMT}" "${YELLOW}${COST_FMT}${RESET}"
+  else
+    add "📡Sub" "${GREEN}📡Sub${RESET}"
+  fi
+  add "⏱️${DUR_STR}" "⏱️${DUR_STR}"
 else
-  add "${SUB_PLAIN}" "${SUB_COL}"
+  add "5h  ${BAR5} ${RL5_PCT:-0}%  🪙${TOK_DAY_F}  ${RL5_IN_DISPLAY}" "${CYAN}5h${RESET}  ${BC5}${BAR5}${RESET} ${BC5}${RL5_PCT:-0}%${RESET}  🪙${TOK_DAY_F}  ${RL5_IN_COL}"
+  brk
+  add "7d  ${BAR7} ${RL7_PCT:-0}%  🪙${TOK_WEEK_F}  ${RL7_IN_DISPLAY}" "${MAGENTA}7d${RESET}  ${BC7}${BAR7}${RESET} ${BC7}${RL7_PCT:-0}%${RESET}  🪙${TOK_WEEK_F}  ${RL7_IN_COL}"
+  if [ "$API_ACTIVE" = "1" ]; then
+    add "${COST_FMT} ${API_PLAIN}" "${YELLOW}${COST_FMT}${RESET} ${API_COL}"
+  else
+    add "${SUB_PLAIN}" "${SUB_COL}"
+  fi
+  add "⏱️ ${DUR_STR}" "⏱️ ${DUR_STR}"
 fi
-add "⏱️ ${DUR_STR}" "⏱️ ${DUR_STR}"
 
 # ---- recommendation: cache codebase complexity (1h) ----
 # Real Claude thinking: Haiku (no thinking) → Sonnet (low/med/high) → Opus (high/xhigh/max)
@@ -346,9 +459,9 @@ if [ $HC_AGE -gt 3600 ]; then
   if   [ $SCORE -lt 10  ]; then H_MODEL="Haiku 4.5";  H_EFFORT="—";  H_TIER=1
   elif [ $SCORE -lt 50  ]; then H_MODEL="Sonnet 4.6"; H_EFFORT="low"; H_TIER=2
   elif [ $SCORE -lt 120 ]; then H_MODEL="Sonnet 4.6"; H_EFFORT="high"; H_TIER=3
-  elif [ $SCORE -lt 180 ]; then H_MODEL="Opus 4.7";   H_EFFORT="high"; H_TIER=4
-  elif [ $SCORE -lt 250 ]; then H_MODEL="Opus 4.7";   H_EFFORT="xhigh"; H_TIER=5
-  else                          H_MODEL="Opus 4.7";   H_EFFORT="max";  H_TIER=6
+  elif [ $SCORE -lt 180 ]; then H_MODEL="Opus 4.8";   H_EFFORT="high"; H_TIER=4
+  elif [ $SCORE -lt 250 ]; then H_MODEL="Opus 4.8";   H_EFFORT="xhigh"; H_TIER=5
+  else                          H_MODEL="Opus 4.8";   H_EFFORT="max";  H_TIER=6
   fi
   echo "$H_MODEL|$H_EFFORT|$H_TIER|score=$SCORE" > "$HEUR_CACHE"
 fi
@@ -382,7 +495,7 @@ pctcol() {
 emoji_extra() {
   local s=$1 n=0 ch
   # count known emoji
-  for e in 🧠 📁 🌿 ⏱️ 🔄 🔑 📡 💡 🦧; do
+  for e in 🧠 📁 🌿 ⏱️ 🔄 🔑 📡 💡 🦧 🪙 ⚡ 🟢 🔴 🟡 ⏳; do
     local t=${s//$e/}
     local diff=$(( (${#s} - ${#t}) / ${#e} ))
     n=$((n + diff))
